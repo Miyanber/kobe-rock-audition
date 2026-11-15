@@ -67,24 +67,24 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
       <div className="max-w-lg w-full space-y-6">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-          <div className="bg-slate-900 px-6 py-7 text-center">
-            <div className="mx-auto h-12 w-12 rounded-xl bg-indigo-500 flex items-center justify-center mb-3 shadow-lg">
+        <div className="bg-zinc-50 rounded-sm overflow-hidden border border-zinc-300">
+          <div className="border-t-4 border-t-slate-700 border-b border-zinc-300 px-6 py-7 text-center">
+            <div className="mx-auto h-12 w-12 rounded-sm bg-slate-700 flex items-center justify-center mb-3">
               <Award className="h-7 w-7 text-white" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-zinc-800 tracking-tight">
               Kobe Rock Audition
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-1">
+            <p className="text-xs sm:text-sm text-zinc-600 mt-1">
               軽音サークル オーディション採点・集計システム
             </p>
           </div>
 
           <div className="p-6 space-y-5">
             {errorMsg && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-3.5 text-sm flex items-start gap-2.5">
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-sm p-3.5 text-sm flex items-start gap-2.5">
                 <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
@@ -93,22 +93,22 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
             <div className="space-y-3">
               <a
                 href="/api/auth/google"
-                className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm sm:text-base shadow-sm transition"
+                className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-3 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm sm:text-base transition"
               >
                 <LogIn className="h-5 w-5" />
                 <span>学内Googleアカウントでログイン</span>
               </a>
-              <p className="text-xs text-center text-slate-500">
+              <p className="text-xs text-center text-zinc-500">
                 許可ドメイン:{' '}
-                <span className="font-mono font-medium text-slate-700">
+                <span className="font-mono font-medium text-zinc-700">
                   {authInfo.allowedDomains.join(', ') || '未設定'}
                 </span>
               </p>
             </div>
 
             {authInfo.devLoginEnabled && devUsers.length > 0 && (
-              <div className="pt-4 border-t border-slate-200 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <div className="pt-4 border-t border-zinc-300 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-3 py-2">
                   <Wrench className="h-4 w-4 shrink-0" />
                   <span>
                     ローカル開発・検証用ダミーログイン（ワンクリックで権限別アカウントに切替可能）
@@ -122,26 +122,26 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
                       type="button"
                       disabled={loadingId !== null}
                       onClick={() => handleDevLogin(u.id)}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition flex items-center justify-between gap-2 disabled:opacity-50 cursor-pointer"
+                      className="w-full text-left px-3.5 py-2.5 rounded-sm border border-zinc-300 hover:border-slate-500 hover:bg-slate-100 transition flex items-center justify-between gap-2 disabled:opacity-50 cursor-pointer"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm text-slate-900 truncate">
+                          <span className="font-semibold text-sm text-zinc-800 truncate">
                             {u.name}
                           </span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-zinc-500">
                             ({u.grade}回生)
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 font-mono truncate">
+                        <p className="text-xs text-zinc-500 font-mono truncate">
                           {u.email}
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold shrink-0 ${
                           u.role === 'ADMIN'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : 'bg-zinc-100 text-zinc-700 border border-zinc-300'
                         }`}
                       >
                         {u.role === 'ADMIN' ? (

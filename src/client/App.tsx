@@ -70,7 +70,7 @@ export function App() {
 
   if (loadingAuth || !authInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-500">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100 text-sm text-zinc-500">
         システムを読み込み中...
       </div>
     );

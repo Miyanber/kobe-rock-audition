@@ -1,8 +1,21 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @layer base {
   input[type="range"] {
-    accent-color: #4f46e5;
+    accent-color: #334155;
+    height: 0.5rem;
+  }
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    background-color: #ffffff;
+    border-radius: 2px;
+  }
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: #334155;
+    box-shadow: none;
   }
 }
-

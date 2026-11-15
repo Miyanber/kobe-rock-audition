@@ -210,7 +210,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
 
   if (loading) {
     return (
-      <div className="py-16 text-center text-slate-500 text-sm">
+      <div className="py-16 text-center text-zinc-500 text-sm">
         採点データを読み込み中...
       </div>
     );
@@ -218,12 +218,12 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
 
   if (error) {
     return (
-      <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center space-y-3">
+      <div className="bg-rose-50 border border-rose-200 rounded-sm p-6 text-center space-y-3">
         <p className="text-rose-800 font-medium">{error}</p>
         <button
           type="button"
           onClick={loadCurrent}
-          className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium cursor-pointer"
+          className="px-4 py-2 rounded-sm bg-rose-700 text-white text-sm font-medium cursor-pointer"
         >
           再読み込み
         </button>
@@ -234,14 +234,14 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   // 1. ACTIVEなオーディションが存在しない場合
   if (!activeAudition) {
     return (
-      <div className="max-w-2xl mx-auto bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-xs space-y-4">
-        <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
-          <Music className="h-6 w-6 text-slate-500" />
+      <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
+        <div className="mx-auto h-12 w-12 rounded-sm bg-zinc-100 flex items-center justify-center">
+          <Music className="h-6 w-6 text-zinc-500" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900">
+        <h2 className="text-lg font-bold text-zinc-800">
           現在公開中（ACTIVE）のオーディションはありません
         </h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-zinc-600">
           採点受付が開始されるまでお待ちください。
           {data?.draftAudition &&
             `現在「${data.draftAudition.title}」の出演バンドエントリー（Wiki）を受付中です。`}
@@ -250,7 +250,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
           <button
             type="button"
             onClick={() => onNavigate('wiki')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm transition cursor-pointer"
           >
             <Music className="h-4 w-4" />
             出演バンドWiki登録・編集へ進む
@@ -263,14 +263,14 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   // 2. AuditionVoters に未登録のユーザーには専用案内画面を表示
   if (!voterEntry) {
     return (
-      <div className="max-w-2xl mx-auto bg-white border border-amber-200 rounded-2xl p-8 text-center shadow-xs space-y-4">
-        <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+      <div className="max-w-2xl mx-auto bg-zinc-50 border border-amber-200 rounded-sm p-8 text-center space-y-4">
+        <div className="mx-auto h-12 w-12 rounded-sm bg-amber-50 flex items-center justify-center">
           <AlertTriangle className="h-6 w-6 text-amber-600" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900">
+        <h2 className="text-lg font-bold text-zinc-800">
           採点・コメント対象者に登録されていません
         </h2>
-        <p className="text-sm text-slate-600 leading-relaxed">
+        <p className="text-sm text-zinc-600 leading-relaxed">
           現在開催中の「<span className="font-semibold">{activeAudition.title}</span>
           」について、あなたのアカウント（<span className="font-mono">{user.email}</span>
           ）には採点・コメント権限が割り当てられていません。
@@ -284,31 +284,31 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   return (
     <div className="space-y-5 pb-24">
       {/* 開催回情報 & 提出ステータスヘッダー */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+      <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                 採点受付中
               </span>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
                 {isCommentOnly ? '権限: コメント入力のみ' : '権限: 採点＋コメント'}
               </span>
               {voterEntry.isSubmitted ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   提出済（再編集可）
                 </span>
               ) : (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                   未提出
                 </span>
               )}
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 mt-1.5">
+            <h1 className="text-lg sm:text-xl font-bold text-zinc-800 mt-1.5">
               {activeAudition.title}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-zinc-500 mt-0.5">
               開催日: {activeAudition.eventDate}
               {activeAudition.deadline && ` / 締切: ${activeAudition.deadline.replace('T', ' ')}`}
             </p>
@@ -316,7 +316,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-medium border ${
                 isOnline
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -340,7 +340,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                 type="button"
                 disabled={isSyncing}
                 onClick={syncPendingDrafts}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-semibold bg-slate-700 hover:bg-slate-700 text-white transition cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 未同期 ({dirtyCount}件) を同期
@@ -351,17 +351,17 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
 
         {/* 進捗バー */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
             <span>
               対象バンド入力進捗（自バンド {ownBandSet.size} 組除外済み）
             </span>
-            <span className="font-bold text-slate-900">
+            <span className="font-bold text-zinc-800">
               {completionStatus.completed} / {completionStatus.total} バンド完了
             </span>
           </div>
-          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full h-2.5 bg-zinc-100 rounded-sm overflow-hidden">
             <div
-              className="h-full bg-indigo-600 transition-all duration-300"
+              className="h-full bg-slate-700 transition-all duration-300"
               style={{
                 width: `${
                   completionStatus.total > 0
@@ -377,7 +377,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       {/* 通知トースト */}
       {(feedback || syncMessage) && (
         <div
-          className={`rounded-xl px-4 py-3 text-sm font-medium border shadow-sm ${
+          className={`rounded-sm px-4 py-3 text-sm font-medium border ${
             feedback?.type === 'error'
               ? 'bg-rose-50 border-rose-200 text-rose-800'
               : 'bg-emerald-50 border-emerald-200 text-emerald-800'
@@ -396,23 +396,23 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
             return (
               <div
                 key={band.id}
-                className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-2xl p-4 sm:p-5 opacity-85"
+                className="bg-zinc-200/60 border border-zinc-300 text-zinc-600 rounded-sm p-4 sm:p-5"
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2.5">
-                    <span className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-slate-300 text-slate-700 font-bold text-xs">
+                    <span className="inline-flex items-center justify-center h-7 w-7 rounded-sm bg-zinc-200 text-zinc-700 font-bold text-xs">
                       #{band.performanceOrder}
                     </span>
                     <div>
-                      <h3 className="font-bold text-slate-700 text-base">
+                      <h3 className="font-bold text-zinc-700 text-base">
                         {band.name}
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-zinc-500">
                         メンバー: {band.members.map((m) => m.name).join(' / ') || '未設定'}
                       </p>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs bg-zinc-200 text-zinc-600">
                     <Ban className="h-3.5 w-3.5" />
                     自バンドのため採点対象外（自動除外）
                   </span>
@@ -443,40 +443,40 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
           return (
             <div
               key={band.id}
-              className={`bg-white border rounded-2xl p-4 sm:p-5 shadow-xs transition ${
+              className={`bg-zinc-50 border rounded-sm p-4 sm:p-5 transition ${
                 draft.locked
-                  ? 'border-indigo-300 bg-indigo-50/10'
+                  ? 'border-slate-300 bg-slate-100'
                   : isCompleted
                     ? 'border-emerald-300'
-                    : 'border-slate-200'
+                    : 'border-zinc-300'
               }`}
             >
               {/* カードヘッダー */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3.5 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3.5 border-b border-zinc-300">
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-slate-900 text-white font-bold text-sm shrink-0">
+                  <span className="inline-flex items-center justify-center h-8 w-8 rounded-sm bg-slate-700 text-white font-bold text-sm shrink-0">
                     {band.performanceOrder}
                   </span>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                      <h3 className="font-bold text-zinc-800 text-base sm:text-lg">
                         {band.name}
                       </h3>
                       {draft.dirty ? (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-amber-50 text-amber-800">
                           未保存の下書き
                         </span>
                       ) : isCompleted ? (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-emerald-50 text-emerald-800">
                           保存済
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">
+                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-zinc-100 text-zinc-600">
                           未入力
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-zinc-500 mt-0.5">
                       出演メンバー:{' '}
                       {band.members.map((m) => `${m.name}(${m.grade}回)`).join(', ') ||
                         '未登録'}
@@ -487,13 +487,13 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                 {/* 誤操作防止ロックトグル & 合計点表示 */}
                 <div className="flex items-center gap-2.5 self-end sm:self-auto">
                   {!isCommentOnly && (
-                    <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-center min-w-[92px]">
-                      <div className="text-[10px] text-slate-300 leading-none">
+                    <div className="px-3.5 py-1.5 rounded-sm bg-slate-700 text-white text-center min-w-[92px]">
+                      <div className="text-[10px] text-zinc-300 leading-none">
                         合計点
                       </div>
                       <div className="text-lg font-extrabold leading-tight tabular-nums">
                         {total !== null ? total : '--'}
-                        <span className="text-xs font-normal text-slate-400">
+                        <span className="text-xs font-normal text-zinc-400">
                           /100
                         </span>
                       </div>
@@ -505,10 +505,10 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                     onClick={() =>
                       updateDraft(band.id, { locked: !draft.locked }, false)
                     }
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs font-semibold border transition cursor-pointer ${
                       draft.locked
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                        ? 'bg-slate-700 text-white border-slate-700'
+                        : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
                     }`}
                     title="スマホスクロール時の誤操作防止ロック"
                   >
@@ -531,11 +531,11 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
               {!isCommentOnly && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                   {/* 魅力点 (0-50) */}
-                  <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-2.5">
+                  <div className="bg-zinc-100 rounded-sm p-3.5 border border-zinc-300 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label
                         htmlFor={`charm-${band.id}`}
-                        className="text-sm font-bold text-slate-800"
+                        className="text-sm font-bold text-zinc-800"
                       >
                         魅力点（0〜50）
                       </label>
@@ -557,7 +557,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                             updateDraft(band.id, { charmScore: num });
                           }
                         }}
-                        className="w-20 text-right font-bold text-base rounded-lg border border-slate-300 bg-white px-2.5 py-1 disabled:bg-slate-100 disabled:text-slate-500"
+                        className="w-20 text-right font-bold text-base rounded-sm border border-zinc-300 bg-zinc-50 px-2.5 py-1 disabled:bg-zinc-100 disabled:text-zinc-500"
                       />
                     </div>
                     <input
@@ -572,7 +572,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                       }
                       className="w-full h-2.5 cursor-pointer disabled:opacity-50"
                     />
-                    <div className="flex justify-between text-[11px] text-slate-400">
+                    <div className="flex justify-between text-[11px] text-zinc-400">
                       <span>0</span>
                       <span>25</span>
                       <span>50</span>
@@ -580,11 +580,11 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                   </div>
 
                   {/* 技術点 (0-50) */}
-                  <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 space-y-2.5">
+                  <div className="bg-zinc-100 rounded-sm p-3.5 border border-zinc-300 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label
                         htmlFor={`tech-${band.id}`}
-                        className="text-sm font-bold text-slate-800"
+                        className="text-sm font-bold text-zinc-800"
                       >
                         技術点（0〜50）
                       </label>
@@ -606,7 +606,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                             updateDraft(band.id, { techScore: num });
                           }
                         }}
-                        className="w-20 text-right font-bold text-base rounded-lg border border-slate-300 bg-white px-2.5 py-1 disabled:bg-slate-100 disabled:text-slate-500"
+                        className="w-20 text-right font-bold text-base rounded-sm border border-zinc-300 bg-zinc-50 px-2.5 py-1 disabled:bg-zinc-100 disabled:text-zinc-500"
                       />
                     </div>
                     <input
@@ -621,7 +621,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                       }
                       className="w-full h-2.5 cursor-pointer disabled:opacity-50"
                     />
-                    <div className="flex justify-between text-[11px] text-slate-400">
+                    <div className="flex justify-between text-[11px] text-zinc-400">
                       <span>0</span>
                       <span>25</span>
                       <span>50</span>
@@ -635,11 +635,11 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor={`comment-${band.id}`}
-                    className="text-sm font-bold text-slate-800"
+                    className="text-sm font-bold text-zinc-800"
                   >
                     講評コメント <span className="text-rose-500">*必須</span>
                   </label>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-zinc-400">
                     {draft.comment.length} 文字
                   </span>
                 </div>
@@ -652,7 +652,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                     updateDraft(band.id, { comment: e.target.value })
                   }
                   placeholder="演奏・表現・アレンジなどについてのコメントを入力してください..."
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-slate-100 disabled:text-slate-500"
+                  className="w-full rounded-sm border border-zinc-300 px-3.5 py-2.5 text-sm focus:border-slate-700 focus:outline-none focus:ring-0 disabled:bg-zinc-100 disabled:text-zinc-500"
                 />
               </div>
 
@@ -661,7 +661,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                   type="button"
                   disabled={savingBandId === band.id}
                   onClick={() => handleSaveSingleBand(band.id, band.name)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-semibold transition disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold transition disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
                   {savingBandId === band.id ? '保存中...' : 'このバンドを保存'}
@@ -673,11 +673,11 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       </div>
 
       {/* 下部固定アクションバー */}
-      <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200 shadow-lg px-3 sm:px-6 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-20 bg-zinc-50 border-t border-zinc-300 px-3 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          <div className="text-xs sm:text-sm text-slate-700 font-medium">
+          <div className="text-xs sm:text-sm text-zinc-700 font-medium">
             完了:{' '}
-            <span className="font-bold text-indigo-700">
+            <span className="font-bold text-slate-700">
               {completionStatus.completed}/{completionStatus.total}
             </span>
             {dirtyCount > 0 && (
@@ -691,7 +691,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
             <button
               type="button"
               onClick={() => setShowPreviewModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-semibold transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-sm bg-zinc-100 hover:bg-zinc-100 text-zinc-800 text-xs sm:text-sm font-semibold transition cursor-pointer"
             >
               <Eye className="h-4 w-4" />
               <span>マイ順位確認</span>
@@ -701,7 +701,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
               type="button"
               disabled={submittingAll}
               onClick={handleFinalSubmit}
-              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm transition disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs sm:text-sm font-bold transition disabled:opacity-50 cursor-pointer"
             >
               <Send className="h-4 w-4" />
               <span>
@@ -718,21 +718,21 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
 
       {/* マイ採点・順位確認モーダル */}
       {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-700/60 flex items-center justify-center p-4">
+          <div className="bg-zinc-50 rounded-sm max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between">
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                <h2 className="text-base sm:text-lg font-bold text-zinc-800">
                   自分が付けた点数・順位プレビュー
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-zinc-500">
                   提出前のバランス確認にご利用ください（自バンドは自動除外済み）
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowPreviewModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"
+                className="p-1.5 rounded-sm hover:bg-zinc-100 text-zinc-500 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -742,28 +742,28 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
               {myPreviewList.map((item, idx) => (
                 <div
                   key={item.band.id}
-                  className="border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  className="border border-zinc-300 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs shrink-0">
+                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-sm bg-slate-100 text-slate-800 font-bold text-xs shrink-0">
                         {idx + 1}
                       </span>
-                      <span className="font-bold text-sm text-slate-900 truncate">
+                      <span className="font-bold text-sm text-zinc-800 truncate">
                         #{item.band.performanceOrder} {item.band.name}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                    <p className="text-xs text-zinc-600 mt-1 line-clamp-2">
                       {item.comment || '（コメント未入力）'}
                     </p>
                   </div>
 
                   {!isCommentOnly && (
                     <div className="text-right shrink-0">
-                      <div className="text-base font-extrabold text-slate-900 tabular-nums">
+                      <div className="text-base font-extrabold text-zinc-800 tabular-nums">
                         {item.total !== null ? `${item.total}点` : '未入力'}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[11px] text-zinc-500">
                         魅力:{item.charm ?? '-'} / 技術:{item.tech ?? '-'}
                       </div>
                     </div>
@@ -772,11 +772,11 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
               ))}
             </div>
 
-            <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+            <div className="px-5 py-3.5 border-t border-zinc-300 bg-zinc-100 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowPreviewModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer"
+                className="px-4 py-2 rounded-sm border border-zinc-300 bg-zinc-50 text-sm font-medium text-zinc-700 cursor-pointer"
               >
                 戻る
               </button>
@@ -784,7 +784,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
                 type="button"
                 disabled={submittingAll}
                 onClick={handleFinalSubmit}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold cursor-pointer disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
                 このまま最終提出する
