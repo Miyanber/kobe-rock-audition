@@ -1,0 +1,11 @@
+# Cloudflare Workers / ローカル開発用シークレット設定テンプレート
+# コピーして .dev.vars を作成してください（.dev.vars はGit管理外）
+
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+ALLOWED_GOOGLE_DOMAIN=stu.kobe-u.ac.jp
+INITIAL_ADMIN_EMAILS=admin@stu.kobe-u.ac.jp
+SESSION_SECRET=change-this-to-a-long-random-secret-key-at-least-32-chars
+ALLOW_UNREGISTERED_DOMAIN_USERS=true
+ENABLE_DEV_LOGIN=true
+

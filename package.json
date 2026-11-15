@@ -1,0 +1,48 @@
+{
+  "name": "kobe-rock-audition",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:client && npm run typecheck",
+    "build:client": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply kobe-rock-audition-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kobe-rock-audition-db --remote"
+  },
+  "dependencies": {
+    "@hono/oauth-providers": "^0.9.1",
+    "@hono/zod-validator": "^0.4.3",
+    "@hookform/resolvers": "^5.0.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.7.7",
+    "lucide-react": "^0.487.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.55.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.14.1",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.3.9",
+    "better-sqlite3": "^11.9.1",
+    "drizzle-kit": "^0.30.6",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1",
+    "wrangler": "^4.11.0"
+  }
+}
