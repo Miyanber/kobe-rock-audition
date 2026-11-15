@@ -207,5 +207,56 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       'コメント',
     ]);
   });
+
+  it('ADMINはオーディションと部員を削除でき、自分自身の削除は拒否される', async () => {
+    const adminCookie = await loginAs('u-admin');
+    const voterCookie = await loginAs('u-voter1');
+
+    // VOTERは削除不可
+    const forbiddenAuditionDelete = await app.request(
+      '/api/admin/auditions/aud-2026-summer',
+      { method: 'DELETE', headers: { Cookie: voterCookie } },
+    );
+    expect(forbiddenAuditionDelete.status).toBe(403);
+
+    // ADMINはオーディション削除可能
+    const delAuditionRes = await app.request(
+      '/api/admin/auditions/aud-2026-summer',
+      { method: 'DELETE', headers: { Cookie: adminCookie } },
+    );
+    expect(delAuditionRes.status).toBe(200);
+
+    const afterListRes = await app.request('/api/admin/auditions', {
+      headers: { Cookie: adminCookie },
+    });
+    const afterList = (await afterListRes.json()) as {
+      auditions: Array<{ id: string }>;
+    };
+    expect(afterList.auditions.some((a) => a.id === 'aud-2026-summer')).toBe(
+      false,
+    );
+
+    // 自分自身の削除は400
+    const selfDeleteRes = await app.request('/api/admin/users/u-admin', {
+      method: 'DELETE',
+      headers: { Cookie: adminCookie },
+    });
+    expect(selfDeleteRes.status).toBe(400);
+
+    // 他部員の削除は200
+    const delUserRes = await app.request('/api/admin/users/u-unregistered', {
+      method: 'DELETE',
+      headers: { Cookie: adminCookie },
+    });
+    expect(delUserRes.status).toBe(200);
+
+    const usersRes = await app.request('/api/admin/users', {
+      headers: { Cookie: adminCookie },
+    });
+    const usersBody = (await usersRes.json()) as {
+      users: Array<{ id: string }>;
+    };
+    expect(usersBody.users.some((u) => u.id === 'u-unregistered')).toBe(false);
+  });
 });
 

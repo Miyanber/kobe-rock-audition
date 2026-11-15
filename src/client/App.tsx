@@ -37,6 +37,8 @@ export function App() {
           const active = res.auditions.find((a) => a.status === 'ACTIVE');
           return active?.id ?? res.auditions[0].id;
         });
+      } else {
+        setSelectedAdminAuditionId('');
       }
     } catch {
       // 非ADMIN等では無視

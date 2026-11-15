@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   FilePlus2,
   Play,
+  Trash2,
   Upload,
   UserCheck,
 } from 'lucide-react';
@@ -56,6 +57,11 @@ export function AdminSetupPage({
     useState<PermissionType>('SCORE_AND_COMMENT');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // オーディション削除確認モーダル
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deletingAudition, setDeletingAudition] = useState(false);
+
   const selectedAudition = auditions.find((a) => a.id === selectedAuditionId);
 
   const loadContext = async () => {
@@ -72,6 +78,8 @@ export function AdminSetupPage({
   };
 
   useEffect(() => {
+    setShowDeleteModal(false);
+    setDeleteConfirmInput('');
     void loadContext();
   }, [selectedAuditionId]);
 
@@ -123,6 +131,26 @@ export function AdminSetupPage({
     });
     await onAuditionsChanged();
     showToast(`ステータスを ${status} に切り替えました`);
+  };
+
+  const handleDeleteAudition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAudition || deleteConfirmInput !== selectedAudition.title) {
+      return;
+    }
+    setDeletingAudition(true);
+    const deletedTitle = selectedAudition.title;
+    try {
+      await apiJson(`/api/admin/auditions/${selectedAudition.id}`, {
+        method: 'DELETE',
+      });
+      setShowDeleteModal(false);
+      setDeleteConfirmInput('');
+      await onAuditionsChanged();
+      showToast(`オーディション「${deletedTitle}」を削除しました`);
+    } finally {
+      setDeletingAudition(false);
+    }
   };
 
   const handleBulkBands = async () => {
@@ -248,10 +276,23 @@ export function AdminSetupPage({
         <>
           {/* 2. ステータス切替 */}
           <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3">
-            <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
-              <Play className="h-5 w-5 text-emerald-600" />
-              公開ステータス切替（対象: {selectedAudition.title}）
-            </h2>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                <Play className="h-5 w-5 text-emerald-600" />
+                公開ステータス切替（対象: {selectedAudition.title}）
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteConfirmInput('');
+                  setShowDeleteModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 transition cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                このオーディションを削除
+              </button>
+            </div>
             <p className="text-xs text-zinc-500">
               DRAFT（準備中・Wiki一般編集可）→ ACTIVE（公開中・採点受付・Wiki自動ロック＆他ACTIVE自動CLOSED）→
               CLOSED（採点締切）
@@ -262,11 +303,10 @@ export function AdminSetupPage({
                   key={st}
                   type="button"
                   onClick={() => handleChangeStatus(st)}
-                  className={`px-4 py-2 rounded-sm text-sm font-bold border transition cursor-pointer ${
-                    selectedAudition.status === st
+                  className={`px-4 py-2 rounded-sm text-sm font-bold border transition cursor-pointer ${selectedAudition.status === st
                       ? 'bg-slate-700 text-white border-slate-900'
                       : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                  }`}
+                    }`}
                 >
                   {st}
                   {st === 'DRAFT' && '（準備・Wiki受付）'}
@@ -361,11 +401,10 @@ export function AdminSetupPage({
                                 : [...prev, yr],
                             )
                           }
-                          className={`px-2.5 py-1 rounded-sm text-xs font-semibold border cursor-pointer ${
-                            active
+                          className={`px-2.5 py-1 rounded-sm text-xs font-semibold border cursor-pointer ${active
                               ? 'bg-slate-700 text-white border-slate-700'
                               : 'bg-zinc-50 text-zinc-700 border-zinc-300'
-                          }`}
+                            }`}
                         >
                           {yr}年入部
                         </button>
@@ -383,9 +422,9 @@ export function AdminSetupPage({
                     onChange={(e) =>
                       setPerformerFilter(
                         e.target.value as
-                          | 'ALL'
-                          | 'PERFORMERS_ONLY'
-                          | 'NON_PERFORMERS_ONLY',
+                        | 'ALL'
+                        | 'PERFORMERS_ONLY'
+                        | 'NON_PERFORMERS_ONLY',
                       )
                     }
                     className="w-full rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-semibold"
@@ -463,11 +502,10 @@ export function AdminSetupPage({
                         <td className="px-3 py-2.5">
                           {entry ? (
                             <span
-                              className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${
-                                entry.permissionType === 'SCORE_AND_COMMENT'
+                              className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${entry.permissionType === 'SCORE_AND_COMMENT'
                                   ? 'bg-emerald-50 text-emerald-800'
                                   : 'bg-amber-50 text-amber-800'
-                              }`}
+                                }`}
                             >
                               {entry.permissionType === 'SCORE_AND_COMMENT'
                                 ? '採点＋コメント'
@@ -516,6 +554,73 @@ export function AdminSetupPage({
             </div>
           </section>
         </>
+      )}
+
+      {showDeleteModal && selectedAudition && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-audition-modal-title"
+        >
+          <div className="w-full max-w-md rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
+            <div className="space-y-1.5">
+              <h3
+                id="delete-audition-modal-title"
+                className="text-base font-bold text-rose-700 flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                オーディションの完全削除
+              </h3>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                この操作は元に戻せません。対象オーディションに紐づくバンド、参加権限、採点データもすべて完全に削除されます。
+              </p>
+            </div>
+
+            <form onSubmit={handleDeleteAudition} className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-xs text-zinc-700">
+                  削除を確定するには、以下のオーディション名を手入力してください：
+                </label>
+                <div className="rounded-sm bg-zinc-100 border border-zinc-200 px-3 py-2 text-xs font-mono font-bold text-zinc-800 break-all">
+                  {selectedAudition.title}
+                </div>
+                <input
+                  type="text"
+                  autoFocus
+                  value={deleteConfirmInput}
+                  onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                  placeholder={selectedAudition.title}
+                  className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={deletingAudition}
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteConfirmInput('');
+                  }}
+                  className="px-3.5 py-2 rounded-sm border border-zinc-300 bg-zinc-50 hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    deleteConfirmInput !== selectedAudition.title ||
+                    deletingAudition
+                  }
+                  className="px-3.5 py-2 rounded-sm bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {deletingAudition ? '削除中...' : '完全に削除する'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

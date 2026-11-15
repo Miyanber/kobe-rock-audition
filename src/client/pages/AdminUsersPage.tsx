@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Shield, Upload, UserCheck, Users } from 'lucide-react';
+import { Shield, Trash2, Upload, UserCheck, Users } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
 import type { AuditionDto, AuthUserDto, SelectableUserDto } from '../types.ts';
@@ -102,6 +102,34 @@ export function AdminUsersPage({
     }
   };
 
+  const handleDeleteUser = async (
+    target: SelectableUserDto & { role: Role },
+  ) => {
+    if (
+      !window.confirm(
+        `「${target.name}」（${target.email}）を部員マスタから削除しますか？\n※この部員に紐づくバンド所属、投票権限、採点データもすべて削除され、元に戻せません。`,
+      )
+    ) {
+      return;
+    }
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/users/${target.id}`, {
+        method: 'DELETE',
+      });
+      await loadUsers();
+      setMessage({
+        type: 'ok',
+        text: `「${target.name}」を部員マスタから削除しました`,
+      });
+    } catch (err) {
+      setMessage({
+        type: 'err',
+        text: err instanceof Error ? err.message : '部員の削除に失敗しました',
+      });
+    }
+  };
+
   return (
     <div className="space-y-5">
       <AdminAuditionHeader
@@ -182,7 +210,7 @@ export function AdminUsersPage({
                   <th className="px-4 py-3">メールアドレス</th>
                   <th className="px-4 py-3">入部年度 / 回生</th>
                   <th className="px-4 py-3">ロール</th>
-                  <th className="px-4 py-3 text-right">権限変更</th>
+                  <th className="px-4 py-3 text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -219,17 +247,33 @@ export function AdminUsersPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleRole(u)}
-                        className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition cursor-pointer ${
-                          u.role === 'ADMIN'
-                            ? 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                            : 'bg-amber-50 hover:bg-amber-50 text-amber-800 border-amber-300'
-                        }`}
-                      >
-                        {u.role === 'ADMIN' ? 'VOTERへ変更' : 'ADMINへ昇格'}
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRole(u)}
+                          className={`px-3 py-1.5 rounded-sm text-xs font-bold border transition cursor-pointer ${
+                            u.role === 'ADMIN'
+                              ? 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                              : 'bg-amber-50 hover:bg-amber-50 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          {u.role === 'ADMIN' ? 'VOTERへ変更' : 'ADMINへ昇格'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(u)}
+                          disabled={u.id === currentUser.id}
+                          title={
+                            u.id === currentUser.id
+                              ? '自分自身は削除できません'
+                              : '部員を削除'
+                          }
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-bold border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          削除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

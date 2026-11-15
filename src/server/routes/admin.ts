@@ -158,6 +158,23 @@ export const adminRoutes = new Hono<AppEnv>()
       });
     },
   )
+  .delete('/auditions/:id', async (c) => {
+    const db = c.get('db');
+    const id = c.req.param('id');
+
+    const [existing] = await db
+      .select({ id: auditions.id })
+      .from(auditions)
+      .where(eq(auditions.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    }
+
+    await db.delete(auditions).where(eq(auditions.id, id));
+    return c.json({ ok: true, id });
+  })
   .post(
     '/auditions/:id/bands/bulk',
     zValidator('json', BulkBandsSchema),
@@ -677,5 +694,40 @@ export const adminRoutes = new Hono<AppEnv>()
 
       return c.json({ ok: true, userId: targetUserId, role });
     },
-  );
+  )
+  .delete('/users/:userId', async (c) => {
+    const db = c.get('db');
+    const currentUser = c.get('user')!;
+    const targetUserId = c.req.param('userId');
+
+    if (targetUserId === currentUser.id) {
+      return c.json({ error: '自分自身のアカウントは削除できません。' }, 400);
+    }
+
+    const [target] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, targetUserId))
+      .limit(1);
+
+    if (!target) {
+      return c.json({ error: 'ユーザーが見つかりません。' }, 404);
+    }
+
+    if (target.role === 'ADMIN') {
+      const admins = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, 'ADMIN'));
+      if (admins.length <= 1) {
+        return c.json(
+          { error: '最後のADMINユーザーを削除することはできません。' },
+          400,
+        );
+      }
+    }
+
+    await db.delete(users).where(eq(users.id, targetUserId));
+    return c.json({ ok: true, userId: targetUserId });
+  });
 
