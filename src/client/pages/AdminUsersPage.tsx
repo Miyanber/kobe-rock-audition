@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Shield, Trash2, Upload, UserCheck, Users } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
+import { ToastNotification } from '../components/ToastNotification.tsx';
 import type { AuditionDto, AuthUserDto, SelectableUserDto } from '../types.ts';
 import type { Role } from '../../shared/schema/index.ts';
 
@@ -138,17 +139,17 @@ export function AdminUsersPage({
         onSelectAudition={onSelectAudition}
       />
 
-      {message && (
-        <div
-          className={`rounded-sm px-4 py-3 text-sm font-medium border ${
-            message.type === 'err'
-              ? 'bg-rose-50 border-rose-200 text-rose-800'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+      <ToastNotification
+        message={
+          message
+            ? {
+                text: message.text,
+                type: message.type === 'err' ? 'error' : 'success',
+              }
+            : null
+        }
+        onClose={() => setMessage(null)}
+      />
 
       {/* 部員マスタ CSV/TSV 一括登録 */}
       <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3">

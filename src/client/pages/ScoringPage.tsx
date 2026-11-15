@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
+import { ToastNotification } from '../components/ToastNotification.tsx';
 import { useScoreDrafts } from '../hooks/useScoreDrafts.ts';
 import type { AuthUserDto, CurrentAuditionPayload } from '../types.ts';
 import type { AppRoute } from '../components/Layout.tsx';
@@ -375,17 +376,17 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       </div>
 
       {/* 通知トースト */}
-      {(feedback || syncMessage) && (
-        <div
-          className={`rounded-sm px-4 py-3 text-sm font-medium border ${
-            feedback?.type === 'error'
-              ? 'bg-rose-50 border-rose-200 text-rose-800'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}
-        >
-          {feedback?.text ?? syncMessage}
-        </div>
-      )}
+      <ToastNotification
+        message={
+          feedback || syncMessage
+            ? {
+                text: feedback?.text ?? syncMessage ?? '',
+                type: feedback?.type === 'error' ? 'error' : 'success',
+              }
+            : null
+        }
+        onClose={feedback ? () => setFeedback(null) : undefined}
+      />
 
       {/* タイムテーブル & 採点カード一覧 */}
       <div className="space-y-4">

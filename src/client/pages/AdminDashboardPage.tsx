@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
+import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AdminResultsResponse,
   AdminVoterMonitorDto,
@@ -144,11 +145,10 @@ export function AdminDashboardPage({
         onSelectAudition={onSelectAudition}
       />
 
-      {statusMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm px-4 py-2.5 text-sm font-medium">
-          {statusMsg}
-        </div>
-      )}
+      <ToastNotification
+        message={statusMsg ? { text: statusMsg, type: 'success' } : null}
+        onClose={() => setStatusMsg(null)}
+      />
 
       {/* 運用設定 & エクスポート操作パネル */}
       {audition && (

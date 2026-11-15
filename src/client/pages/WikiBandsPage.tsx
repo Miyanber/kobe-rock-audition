@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
+import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AuditionDto,
   AuthUserDto,
@@ -286,17 +287,17 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
         )}
       </div>
 
-      {message && (
-        <div
-          className={`rounded-sm px-4 py-3 text-sm font-medium border ${
-            message.type === 'err'
-              ? 'bg-rose-50 border-rose-200 text-rose-800'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+      <ToastNotification
+        message={
+          message
+            ? {
+                text: message.text,
+                type: message.type === 'err' ? 'error' : 'success',
+              }
+            : null
+        }
+        onClose={() => setMessage(null)}
+      />
 
       {/* バンド一覧 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

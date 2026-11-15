@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  CheckCircle2,
   FilePlus2,
   Play,
   Trash2,
@@ -9,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
+import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AdminVoterMonitorDto,
   AuditionDto,
@@ -219,12 +219,10 @@ export function AdminSetupPage({
         onSelectAudition={onSelectAudition}
       />
 
-      {statusMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm px-4 py-3 text-sm font-medium flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>{statusMessage}</span>
-        </div>
-      )}
+      <ToastNotification
+        message={statusMessage ? { text: statusMessage, type: 'success' } : null}
+        onClose={() => setStatusMessage(null)}
+      />
 
       {/* 1. 新規オーディション作成 */}
       <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4">
