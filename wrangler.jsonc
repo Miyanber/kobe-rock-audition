@@ -14,15 +14,13 @@
     {
       "binding": "DB",
       "database_name": "kobe-rock-audition-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "database_id": "fd090a9c-ee3b-4074-8dc4-84b3431430ed",
       "migrations_dir": "drizzle"
     }
   ],
   "vars": {
-    "ALLOWED_GOOGLE_DOMAIN": "stu.kobe-u.ac.jp",
-    "INITIAL_ADMIN_EMAILS": "admin@stu.kobe-u.ac.jp",
-    "ALLOW_UNREGISTERED_DOMAIN_USERS": "true",
-    "ENABLE_DEV_LOGIN": "false"
+    "ALLOW_UNREGISTERED_DOMAIN_USERS": "false",
+    "ENABLE_DEV_LOGIN": "true"
   }
 }
 
