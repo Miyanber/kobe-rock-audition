@@ -6,6 +6,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/sqlite-core';
+import { AUDITION_STATUS_VALUES } from '../../shared/audition-status.ts';
 
 export const users = sqliteTable(
   'users',
@@ -31,7 +32,7 @@ export const auditions = sqliteTable(
     title: text('title').notNull(),
     eventDate: text('event_date').notNull(),
     deadline: text('deadline'),
-    status: text('status', { enum: ['DRAFT', 'ACTIVE', 'CLOSED'] })
+    status: text('status', { enum: AUDITION_STATUS_VALUES })
       .notNull()
       .default('DRAFT'),
     isPenaltyEnabled: integer('is_penalty_enabled', { mode: 'boolean' })

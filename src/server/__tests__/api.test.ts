@@ -149,7 +149,7 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(actData.auditions.find((a) => a.id === 'aud-2027-spring')?.status).toBe('ACTIVE');
     expect(actData.auditions.find((a) => a.id === 'aud-2026-winter')?.status).toBe('CLOSED');
 
-    // ACTIVE に変わった直後から、一般部員は aud-2027-spring の Wiki 編集ができなくなる
+    // ACTIVE に変わった直後から、一般部員は aud-2027-spring のバンド編集ができなくなる
     const lockedAfterActive = await app.request(
       '/api/auditions/aud-2027-spring/bands',
       {
@@ -166,6 +166,127 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       },
     );
     expect(lockedAfterActive.status).toBe(403);
+  });
+
+  it('ENTRY_CLOSED（募集締切・調整中）では一般部員のバンド編集・採点が禁止され、一覧閲覧とADMIN編集は可能', async () => {
+    const voterCookie = await loginAs('u-voter1');
+    const adminCookie = await loginAs('u-admin');
+
+    // aud-2027-spring を ENTRY_CLOSED に切替
+    const closeEntryRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/status',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({ status: 'ENTRY_CLOSED' }),
+      },
+    );
+    expect(closeEntryRes.status).toBe(200);
+    const closeEntryData = (await closeEntryRes.json()) as {
+      audition: { status: string };
+      auditions: Array<{ id: string; status: string }>;
+    };
+    expect(closeEntryData.audition.status).toBe('ENTRY_CLOSED');
+    // 既存の ACTIVE は影響を受けない
+    expect(closeEntryData.auditions.find((a) => a.id === 'aud-2026-winter')?.status).toBe('ACTIVE');
+
+    // 一般部員からの新規バンド追加・既存バンド編集は 403 ロック
+    const voterAddRes = await app.request('/api/auditions/aud-2027-spring/bands', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: voterCookie,
+      },
+      body: JSON.stringify({
+        name: 'Blocked Entry Band',
+        performanceOrder: 2,
+        memberUserIds: [],
+      }),
+    });
+    expect(voterAddRes.status).toBe(403);
+
+    const voterEditRes = await app.request(
+      '/api/auditions/aud-2027-spring/bands/b-spr-1',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voterCookie,
+        },
+        body: JSON.stringify({
+          name: 'Tampered Name',
+          performanceOrder: 1,
+          memberUserIds: [],
+        }),
+      },
+    );
+    expect(voterEditRes.status).toBe(403);
+
+    // ADMIN によるバンド編集は可能
+    const adminEditRes = await app.request(
+      '/api/auditions/aud-2027-spring/bands/b-spr-1',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          name: 'Adjusted Spring Band',
+          performanceOrder: 1,
+          memberUserIds: ['u-multi'],
+        }),
+      },
+    );
+    expect(adminEditRes.status).toBe(200);
+
+    // ENTRY_CLOSED 中は採点送信不可 (403)
+    const voterScoreRes = await app.request(
+      '/api/auditions/aud-2027-spring/scores/b-spr-1',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voterCookie,
+        },
+        body: JSON.stringify({
+          techScore: 30,
+          charmScore: 30,
+          comment: 'まだ採点期間外',
+        }),
+      },
+    );
+    expect(voterScoreRes.status).toBe(403);
+
+    // 一般部員のバンド一覧取得 (/drafts, /current) に含まれ、canEditWiki は false
+    const draftsRes = await app.request('/api/auditions/drafts', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(draftsRes.status).toBe(200);
+    const draftsBody = (await draftsRes.json()) as {
+      auditions: Array<{ id: string; status: string }>;
+    };
+    expect(draftsBody.auditions.some((a) => a.id === 'aud-2027-spring' && a.status === 'ENTRY_CLOSED')).toBe(true);
+
+    const bandsRes = await app.request('/api/auditions/aud-2027-spring/bands', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(bandsRes.status).toBe(200);
+    const bandsBody = (await bandsRes.json()) as { canEditWiki: boolean };
+    expect(bandsBody.canEditWiki).toBe(false);
+
+    const currentRes = await app.request('/api/auditions/current', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(currentRes.status).toBe(200);
+    const currentBody = (await currentRes.json()) as {
+      preparingAudition: { id: string; status: string } | null;
+    };
+    expect(currentBody.preparingAudition?.id).toBe('aud-2027-spring');
+    expect(currentBody.preparingAudition?.status).toBe('ENTRY_CLOSED');
   });
 
   it('2種類のExcelファイル（2シート集計＆生データ / バンド別講評シート）が仕様通りのシート構成で生成される', async () => {

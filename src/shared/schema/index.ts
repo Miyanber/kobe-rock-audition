@@ -1,10 +1,14 @@
 import { z } from 'zod';
+import {
+  AUDITION_STATUS_VALUES,
+  type AuditionStatus,
+} from '../audition-status.ts';
 
 export const RoleSchema = z.enum(['ADMIN', 'VOTER']);
 export type Role = z.infer<typeof RoleSchema>;
 
-export const AuditionStatusSchema = z.enum(['DRAFT', 'ACTIVE', 'CLOSED']);
-export type AuditionStatus = z.infer<typeof AuditionStatusSchema>;
+export const AuditionStatusSchema = z.enum(AUDITION_STATUS_VALUES);
+export type { AuditionStatus };
 
 export const AggregationMethodSchema = z.enum([
   'DIFF_CORRECTION',

@@ -20,6 +20,7 @@ import type {
   SelectableUserDto,
 } from '../types.ts';
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
+import { getAuditionStatusLabel } from '../../shared/audition-status.ts';
 
 interface WikiBandsPageProps {
   user: AuthUserDto;
@@ -217,10 +218,10 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
     return (
       <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center">
         <p className="font-bold text-zinc-800">
-          表示可能なオーディション（DRAFT / ACTIVE）がまだありません
+          表示可能なオーディションがまだありません
         </p>
         <p className="text-xs text-zinc-500 mt-1">
-          運営委員が新しいオーディションを作成すると、ここにバンドエントリーWikiが表示されます。
+          運営委員が新しいオーディションを作成すると、ここに出演バンド登録画面が表示されます。
         </p>
       </div>
     );
@@ -233,10 +234,10 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-zinc-800">
-              出演バンド エントリー・共同編集（Wiki）
+              出演バンド登録・一覧
             </h1>
             <p className="text-xs text-zinc-500 mt-0.5">
-              準備期間（DRAFT）中は全部員でバンド登録・メンバー選択が可能です。採点開始（ACTIVE）と同時に一般編集は自動ロックされます。
+              「バンド募集中」の期間中は、全部員でバンド登録・メンバー選択ができます。募集締切後は閲覧専用になります。
             </p>
           </div>
 
@@ -248,7 +249,7 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
             >
               {auditionOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
-                  [{opt.eventDate}] {opt.title} ({opt.status})
+                  [{opt.eventDate}] {opt.title} ({getAuditionStatusLabel(opt.status)})
                 </option>
               ))}
             </select>
@@ -278,9 +279,13 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
             {audition.status !== 'DRAFT' && (
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-sm">
                 <Lock className="h-3.5 w-3.5" />
-                {user.role === 'ADMIN'
-                  ? '採点公開中（一般部員ロック中・ADMIN権限で編集可）'
-                  : '採点公開中のため閲覧専用です（編集ロック）'}
+                {audition.status === 'ENTRY_CLOSED'
+                  ? user.role === 'ADMIN'
+                    ? '募集締切・調整中（一般部員ロック中・運営権限で編集可）'
+                    : 'バンド募集は締め切られました（閲覧専用・運営が出演順等を調整中）'
+                  : user.role === 'ADMIN'
+                    ? '採点受付中（一般部員ロック中・運営権限で編集可）'
+                    : '採点受付中のため閲覧専用です（編集ロック）'}
               </div>
             )}
           </div>
@@ -400,7 +405,7 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
           <div className="bg-zinc-50 rounded-sm max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between">
               <h2 className="text-base sm:text-lg font-bold text-zinc-800">
-                {editingBandId ? 'バンド情報の編集' : '新規バンド登録（Wiki）'}
+                {editingBandId ? 'バンド情報の編集' : '新規バンド登録'}
               </h2>
               <button
                 type="button"

@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents and developers working in the `k
 
 ## Project Overview
 
-A web application for managing university light-music club auditions: Google OAuth authentication, Wiki-style band entry during preparation (`DRAFT`), real-time mobile scoring (`ACTIVE`) with automatic self-band exclusion, non-destructive score normalization (Diff-correction with constant `10` & Z-score) and penalty deduction, unsubmitted voter monitoring, and 2-file Excel/CSV export.
+A web application for managing university light-music club auditions: Google OAuth authentication, collaborative band registration during entry (`DRAFT` / バンド募集中), entry-closed adjustment phase (`ENTRY_CLOSED` / 募集締切・調整中), real-time mobile scoring (`ACTIVE` / 採点受付中) with automatic self-band exclusion, non-destructive score normalization (Diff-correction with constant `10` & Z-score) and penalty deduction, unsubmitted voter monitoring, and 2-file Excel/CSV export (`CLOSED` / 採点終了・集計).
 
 Reference documents:
 - [docs/PRD.md](docs/PRD.md) — Product requirements, functional specs, edge cases, and schema design
@@ -71,9 +71,9 @@ Do not weaken or bypass any of these invariants across UI, API, or aggregation:
    - Unregistered users (not in `audition_voters`) cannot submit scores and see a dedicated notice screen.
    - `SCORE_AND_COMMENT`: `techScore` (0–50), `charmScore` (0–50), and non-empty `comment` are required.
    - `COMMENT_ONLY`: Score inputs are hidden in UI, and the server MUST force `techScore = null` and `charmScore = null` regardless of request payload.
-3. **Wiki Auto-Lock by Audition Status**:
-   - When `auditions.status === 'DRAFT'`, all authenticated users (`VOTER` and `ADMIN`) can create/edit/delete bands and select members from `users` (avoiding name typos) with `updatedByUserId` recorded.
-   - When `status !== 'DRAFT'` (`ACTIVE` or `CLOSED`), only `ADMIN` may modify bands; `VOTER` requests must be rejected with `403`.
+3. **Band Registration Auto-Lock by Audition Status**:
+   - When `auditions.status === 'DRAFT'` (バンド募集中), all authenticated users (`VOTER` and `ADMIN`) can create/edit/delete bands and select members from `users` (avoiding name typos) with `updatedByUserId` recorded.
+   - When `status !== 'DRAFT'` (`ENTRY_CLOSED`, `ACTIVE`, or `CLOSED`), only `ADMIN` may modify bands; `VOTER` requests must be rejected with `403`. (`ENTRY_CLOSED` and `ACTIVE` auditions remain viewable by all members in the バンド登録 tab.)
 4. **Immediate Role & Membership Propagation**:
    - Do not cache `role` or `bandIds` inside the JWT cookie. `createDbMiddleware` in `src/server/middleware/auth.ts` loads the user's latest `role` from DB on every request so role promotions/demotions and last-minute `band_members` edits take effect immediately.
    - Prevent demoting the last remaining `ADMIN` user (`PATCH /api/admin/users/:userId/role`).

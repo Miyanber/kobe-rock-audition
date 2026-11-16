@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { AppEnv } from '../types.ts';
 import {
   auditions,
@@ -58,10 +58,18 @@ export const auditionRoutes = new Hono<AppEnv>()
       .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
       .limit(1);
 
+    const [preparingAudition] = await db
+      .select()
+      .from(auditions)
+      .where(inArray(auditions.status, ['DRAFT', 'ENTRY_CLOSED']))
+      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+      .limit(1);
+
     if (!activeAudition) {
       return c.json({
         activeAudition: null,
         draftAudition: draftAudition ?? null,
+        preparingAudition: preparingAudition ?? null,
         voterEntry: null,
         bands: [],
         ownBandIds: [],
@@ -105,6 +113,7 @@ export const auditionRoutes = new Hono<AppEnv>()
     return c.json({
       activeAudition,
       draftAudition: draftAudition ?? null,
+      preparingAudition: preparingAudition ?? null,
       voterEntry: voterEntry ?? null,
       bands: bandsWithMembers,
       ownBandIds,
@@ -116,7 +125,7 @@ export const auditionRoutes = new Hono<AppEnv>()
     const draftAuditions = await db
       .select()
       .from(auditions)
-      .where(eq(auditions.status, 'DRAFT'))
+      .where(inArray(auditions.status, ['DRAFT', 'ENTRY_CLOSED']))
       .orderBy(desc(auditions.eventDate), desc(auditions.createdAt));
     return c.json({ auditions: draftAuditions });
   })
@@ -165,7 +174,7 @@ export const auditionRoutes = new Hono<AppEnv>()
 
     if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
       return c.json(
-        { error: '採点開始（ACTIVE）以降は一般部員によるバンド追加はできません。' },
+        { error: 'バンド募集期間が終了しているため、一般部員によるバンド登録はできません。' },
         403,
       );
     }
@@ -219,7 +228,7 @@ export const auditionRoutes = new Hono<AppEnv>()
 
     if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
       return c.json(
-        { error: '採点開始（ACTIVE）以降は一般部員によるバンド編集はロックされています。' },
+        { error: 'バンド募集期間が終了しているため、一般部員によるバンド編集はロックされています。' },
         403,
       );
     }
@@ -282,7 +291,7 @@ export const auditionRoutes = new Hono<AppEnv>()
 
     if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
       return c.json(
-        { error: '採点開始（ACTIVE）以降は一般部員によるバンド削除はできません。' },
+        { error: 'バンド募集期間が終了しているため、一般部員によるバンド削除はできません。' },
         403,
       );
     }
@@ -310,7 +319,7 @@ export const auditionRoutes = new Hono<AppEnv>()
       return c.json({ error: 'オーディションが見つかりません。' }, 404);
     }
     if (audition.status !== 'ACTIVE') {
-      return c.json({ error: '現在このオーディションは採点受付期間中（ACTIVE）ではありません。' }, 403);
+      return c.json({ error: '現在このオーディションは採点受付期間中ではありません。' }, 403);
     }
 
     const [voter] = await db

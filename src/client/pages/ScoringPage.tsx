@@ -232,29 +232,33 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
     );
   }
 
-  // 1. ACTIVEなオーディションが存在しない場合
+  // 1. 採点受付中のオーディションが存在しない場合
   if (!activeAudition) {
+    const preparingAudition = data?.preparingAudition ?? data?.draftAudition ?? null;
+    const isEntryClosed = preparingAudition?.status === 'ENTRY_CLOSED';
     return (
       <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
         <div className="mx-auto h-12 w-12 rounded-sm bg-zinc-100 flex items-center justify-center">
           <Music className="h-6 w-6 text-zinc-500" />
         </div>
         <h2 className="text-lg font-bold text-zinc-800">
-          現在公開中（ACTIVE）のオーディションはありません
+          現在、採点受付中のオーディションはありません
         </h2>
         <p className="text-sm text-zinc-600">
-          採点受付が開始されるまでお待ちください。
-          {data?.draftAudition &&
-            `現在「${data.draftAudition.title}」の出演バンドエントリー（Wiki）を受付中です。`}
+          {preparingAudition
+            ? isEntryClosed
+              ? `現在「${preparingAudition.title}」はバンド募集を締め切り、開催準備・調整中です。`
+              : `現在「${preparingAudition.title}」の出演バンド募集を受付中です。`
+            : '採点受付が開始されるまでお待ちください。'}
         </p>
-        {data?.draftAudition && (
+        {preparingAudition && (
           <button
             type="button"
             onClick={() => onNavigate('wiki')}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm transition cursor-pointer"
           >
             <Music className="h-4 w-4" />
-            出演バンドWiki登録・編集へ進む
+            {isEntryClosed ? '登録バンド一覧を見る' : 'バンド登録・編集へ進む'}
           </button>
         )}
       </div>

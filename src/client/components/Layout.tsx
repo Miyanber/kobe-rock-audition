@@ -41,12 +41,12 @@ export function Layout({
     icon: typeof ClipboardCheck;
     adminOnly?: boolean;
   }> = [
-    { id: 'scoring', label: '採点入力', icon: ClipboardCheck },
-    { id: 'wiki', label: 'バンドWiki', icon: Music },
-    { id: 'admin-dashboard', label: '集計・管理', icon: FileSpreadsheet, adminOnly: true },
-    { id: 'admin-setup', label: '開催回・設定', icon: Settings, adminOnly: true },
-    { id: 'admin-users', label: '部員マスタ', icon: Users, adminOnly: true },
-  ];
+      { id: 'scoring', label: '採点', icon: ClipboardCheck },
+      { id: 'wiki', label: 'バンド登録', icon: Music },
+      { id: 'admin-dashboard', label: '集計', icon: FileSpreadsheet, adminOnly: true },
+      { id: 'admin-setup', label: '設定', icon: Settings, adminOnly: true },
+      { id: 'admin-users', label: '部員管理', icon: Users, adminOnly: true },
+    ];
 
   const visibleNav = navItems.filter((item) => !item.adminOnly || isAdmin);
 
@@ -98,11 +98,10 @@ export function Layout({
                   key={item.id}
                   type="button"
                   onClick={() => onNavigate(item.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${
-                    active
-                      ? 'bg-slate-700 text-white'
-                      : 'text-zinc-300 hover:text-white hover:bg-slate-700'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${active
+                    ? 'bg-slate-700 text-white'
+                    : 'text-zinc-300 hover:text-white hover:bg-slate-700'
+                    }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>

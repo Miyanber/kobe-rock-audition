@@ -15,6 +15,10 @@ import type {
   SelectableUserDto,
 } from '../types.ts';
 import type { AuditionStatus, PermissionType } from '../../shared/schema/index.ts';
+import {
+  AUDITION_STATUS_LIST,
+  getAuditionStatusLabel,
+} from '../../shared/audition-status.ts';
 
 interface AdminSetupPageProps {
   auditions: AuditionDto[];
@@ -109,7 +113,9 @@ export function AdminSetupPage({
       setNewTitle('');
       await onAuditionsChanged();
       onSelectAudition(res.audition.id);
-      showToast(`新規オーディション「${res.audition.title}」を DRAFT 状態で作成しました`);
+      showToast(
+        `新規オーディション「${res.audition.title}」を「${getAuditionStatusLabel(res.audition.status)}」で作成しました`,
+      );
     } finally {
       setCreating(false);
     }
@@ -120,7 +126,7 @@ export function AdminSetupPage({
     if (
       status === 'ACTIVE' &&
       !window.confirm(
-        `「${selectedAudition.title}」を ACTIVE（公開中）に切り替えますか？\n※現在 ACTIVE な他のオーディションは自動的に CLOSED に変更され、Wikiの一般編集がロックされます。`,
+        `「${selectedAudition.title}」を「採点受付中」に切り替えますか？\n※現在「採点受付中」になっている他のオーディションは自動的に「採点終了・集計」に変更され、一般部員によるバンド登録・編集はロックされます。`,
       )
     ) {
       return;
@@ -130,7 +136,7 @@ export function AdminSetupPage({
       body: JSON.stringify({ status }),
     });
     await onAuditionsChanged();
-    showToast(`ステータスを ${status} に切り替えました`);
+    showToast(`進行ステータスを「${getAuditionStatusLabel(status)}」に切り替えました`);
   };
 
   const handleDeleteAudition = async (e: React.FormEvent) => {
@@ -228,7 +234,7 @@ export function AdminSetupPage({
       <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4">
         <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
           <FilePlus2 className="h-5 w-5 text-slate-700" />
-          新規オーディション開催回の作成（DRAFT）
+          新規オーディションの作成（バンド募集中で開始）
         </h2>
 
         <form
@@ -265,7 +271,7 @@ export function AdminSetupPage({
             disabled={creating}
             className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold cursor-pointer disabled:opacity-50"
           >
-            {creating ? '作成中...' : 'DRAFTで作成'}
+            {creating ? '作成中...' : '作成して募集開始'}
           </button>
         </form>
       </section>
@@ -277,7 +283,7 @@ export function AdminSetupPage({
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
                 <Play className="h-5 w-5 text-emerald-600" />
-                公開ステータス切替（対象: {selectedAudition.title}）
+                進行ステータス切替（対象: {selectedAudition.title}）
               </h2>
               <button
                 type="button"
@@ -292,26 +298,35 @@ export function AdminSetupPage({
               </button>
             </div>
             <p className="text-xs text-zinc-500">
-              DRAFT（準備中・Wiki一般編集可）→ ACTIVE（公開中・採点受付・Wiki自動ロック＆他ACTIVE自動CLOSED）→
-              CLOSED（採点締切）
+              ① バンド募集中 → ② 募集締切・調整中 → ③ 採点受付中 → ④ 採点終了・集計 の順に進めてください
             </p>
-            <div className="flex flex-wrap gap-2.5">
-              {(['DRAFT', 'ACTIVE', 'CLOSED'] as const).map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => handleChangeStatus(st)}
-                  className={`px-4 py-2 rounded-sm text-sm font-bold border transition cursor-pointer ${selectedAudition.status === st
-                      ? 'bg-slate-700 text-white border-slate-900'
-                      : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {AUDITION_STATUS_LIST.map((meta) => {
+                const isSelected = selectedAudition.status === meta.status;
+                return (
+                  <button
+                    key={meta.status}
+                    type="button"
+                    onClick={() => handleChangeStatus(meta.status)}
+                    className={`p-3 rounded-sm text-left border transition cursor-pointer flex flex-col gap-1 ${
+                      isSelected
+                        ? 'bg-slate-700 text-white border-slate-900'
+                        : 'bg-zinc-100 hover:bg-zinc-200/70 text-zinc-800 border-zinc-300'
                     }`}
-                >
-                  {st}
-                  {st === 'DRAFT' && '（準備・Wiki受付）'}
-                  {st === 'ACTIVE' && '（採点公開中）'}
-                  {st === 'CLOSED' && '（終了・締切）'}
-                </button>
-              ))}
+                  >
+                    <span className="text-sm font-bold">
+                      {meta.step}. {meta.label}
+                    </span>
+                    <span
+                      className={`text-[11px] leading-snug ${
+                        isSelected ? 'text-slate-200' : 'text-zinc-500'
+                      }`}
+                    >
+                      {meta.shortDescription}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -400,8 +415,8 @@ export function AdminSetupPage({
                             )
                           }
                           className={`px-2.5 py-1 rounded-sm text-xs font-semibold border cursor-pointer ${active
-                              ? 'bg-slate-700 text-white border-slate-700'
-                              : 'bg-zinc-50 text-zinc-700 border-zinc-300'
+                            ? 'bg-slate-700 text-white border-slate-700'
+                            : 'bg-zinc-50 text-zinc-700 border-zinc-300'
                             }`}
                         >
                           {yr}年入部
@@ -501,8 +516,8 @@ export function AdminSetupPage({
                           {entry ? (
                             <span
                               className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${entry.permissionType === 'SCORE_AND_COMMENT'
-                                  ? 'bg-emerald-50 text-emerald-800'
-                                  : 'bg-amber-50 text-amber-800'
+                                ? 'bg-emerald-50 text-emerald-800'
+                                : 'bg-amber-50 text-amber-800'
                                 }`}
                             >
                               {entry.permissionType === 'SCORE_AND_COMMENT'

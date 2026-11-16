@@ -78,6 +78,7 @@ export interface MyScoreDto {
 export interface CurrentAuditionPayload {
   activeAudition: AuditionDto | null;
   draftAudition: AuditionDto | null;
+  preparingAudition: AuditionDto | null;
   voterEntry: VoterEntryDto | null;
   bands: BandWithMembersDto[];
   ownBandIds: string[];

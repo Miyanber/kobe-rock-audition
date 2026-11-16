@@ -1,4 +1,8 @@
 import { AlertTriangle, Calendar } from 'lucide-react';
+import {
+  AUDITION_STATUS_META,
+  getAuditionStatusLabel,
+} from '../../shared/audition-status.ts';
 import type { AuditionDto } from '../types.ts';
 
 interface AdminAuditionHeaderProps {
@@ -8,23 +12,12 @@ interface AdminAuditionHeaderProps {
 }
 
 export function StatusBadge({ status }: { status: AuditionDto['status'] }) {
-  if (status === 'ACTIVE') {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-        ACTIVE（公開中）
-      </span>
-    );
-  }
-  if (status === 'DRAFT') {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-        DRAFT（準備中）
-      </span>
-    );
-  }
+  const meta = AUDITION_STATUS_META[status];
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold bg-zinc-200 text-zinc-700 border border-zinc-300">
-      CLOSED（終了）
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold border ${meta.badgeClassName}`}
+    >
+      {meta.label}
     </span>
   );
 }
@@ -73,7 +66,7 @@ export function AdminAuditionHeader({
           >
             {sorted.map((aud) => (
               <option key={aud.id} value={aud.id}>
-                [{aud.eventDate}] {aud.title} ({aud.status})
+                [{aud.eventDate}] {aud.title} ({getAuditionStatusLabel(aud.status)})
               </option>
             ))}
           </select>
@@ -92,7 +85,7 @@ export function AdminAuditionHeader({
               {selected.eventDate}）
             </p>
             <p className="text-xs text-amber-800 mt-0.5">
-              現在選択されている開催回は最新ではないか、すでに終了（CLOSED）しています。誤編集・誤更新にご注意ください。
+              現在選択されている開催回は最新ではないか、すでに採点終了・集計済みです。誤編集・誤更新にご注意ください。
             </p>
           </div>
         </div>
