@@ -14,6 +14,7 @@ import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AdminVoterMonitorDto,
   AuditionDto,
+  BandWithMembersDto,
   SelectableUserDto,
 } from '../types.ts';
 import type { AuditionStatus, PermissionType } from '../../shared/schema/index.ts';
@@ -21,6 +22,7 @@ import {
   AUDITION_STATUS_LIST,
   getAuditionStatusLabel,
 } from '../../shared/audition-status.ts';
+import { calculateGrade, isActiveClubGrade } from '../../shared/grade.ts';
 
 interface AdminSetupPageProps {
   auditions: AuditionDto[];
@@ -66,10 +68,11 @@ export function AdminSetupPage({
     warnings: string[];
   } | null>(null);
 
-  // 参加者権限一括設定
+  // 採点・コメント義務設定
   const [allUsers, setAllUsers] = useState<SelectableUserDto[]>([]);
   const [currentVoters, setCurrentVoters] = useState<AdminVoterMonitorDto[]>([]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([]);
+  const [auditionBands, setAuditionBands] = useState<BandWithMembersDto[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
   const [performerFilter, setPerformerFilter] = useState<
     'ALL' | 'PERFORMERS_ONLY' | 'NON_PERFORMERS_ONLY'
   >('ALL');
@@ -90,12 +93,19 @@ export function AdminSetupPage({
     );
     setAllUsers(usersRes.users);
     if (selectedAuditionId) {
-      const votersRes = await apiJson<{ voters: AdminVoterMonitorDto[] }>(
-        `/api/admin/auditions/${selectedAuditionId}/voters`,
-      );
+      const [votersRes, bandsRes] = await Promise.all([
+        apiJson<{ voters: AdminVoterMonitorDto[] }>(
+          `/api/admin/auditions/${selectedAuditionId}/voters`,
+        ),
+        apiJson<{ bands: BandWithMembersDto[] }>(
+          `/api/auditions/${selectedAuditionId}/bands`,
+        ),
+      ]);
       setCurrentVoters(votersRes.voters);
+      setAuditionBands(bandsRes.bands);
     } else {
       setCurrentVoters([]);
+      setAuditionBands([]);
     }
   };
 
@@ -147,10 +157,49 @@ export function AdminSetupPage({
     });
   };
 
-  const availableYears = useMemo(() => {
-    const set = new Set(allUsers.map((u) => u.enrollmentYear));
-    return Array.from(set).sort((a, b) => b - a);
-  }, [allUsers]);
+  // 4月基準で1〜3回生のみ表示（4回生以上は自動非表示）
+  const visibleUsers = useMemo(
+    () => allUsers.filter((u) => isActiveClubGrade(u.enrollmentYear)),
+    [allUsers],
+  );
+
+  const availableGrades = useMemo(() => {
+    const set = new Set(
+      visibleUsers.map((u) => calculateGrade(u.enrollmentYear)),
+    );
+    return Array.from(set).sort((a, b) => a - b);
+  }, [visibleUsers]);
+
+  const performerBandsMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const band of auditionBands) {
+      for (const member of band.members) {
+        const list = map.get(member.userId) ?? [];
+        list.push(band.name);
+        map.set(member.userId, list);
+      }
+    }
+    return map;
+  }, [auditionBands]);
+
+  const bulkMatchedUsers = useMemo(() => {
+    const targetGrades =
+      selectedGrades.length > 0 ? selectedGrades : availableGrades;
+    return visibleUsers.filter((u) => {
+      const grade = calculateGrade(u.enrollmentYear);
+      if (!targetGrades.includes(grade)) return false;
+      const isPerformer = (performerBandsMap.get(u.id)?.length ?? 0) > 0;
+      if (performerFilter === 'PERFORMERS_ONLY') return isPerformer;
+      if (performerFilter === 'NON_PERFORMERS_ONLY') return !isPerformer;
+      return true;
+    });
+  }, [
+    visibleUsers,
+    selectedGrades,
+    availableGrades,
+    performerBandsMap,
+    performerFilter,
+  ]);
 
   const showToast = (msg: string) => {
     setStatusMessage(msg);
@@ -228,26 +277,46 @@ export function AdminSetupPage({
 
   const handleBulkBands = async () => {
     if (!selectedAudition || !bandsCsv.trim()) return;
-    const res = await apiJson<{ insertedCount: number; warnings: string[] }>(
-      `/api/admin/auditions/${selectedAudition.id}/bands/bulk`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ csvText: bandsCsv, replaceExisting: replaceBands }),
-      },
-    );
-    setBandUploadResult(res);
+    const res = await apiJson<{
+      insertedCount: number;
+      warnings: string[];
+      bands: BandWithMembersDto[];
+    }>(`/api/admin/auditions/${selectedAudition.id}/bands/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ csvText: bandsCsv, replaceExisting: replaceBands }),
+    });
+    setBandUploadResult({
+      insertedCount: res.insertedCount,
+      warnings: res.warnings,
+    });
+    setAuditionBands(res.bands);
     showToast(`${res.insertedCount}件のバンドを一括登録しました`);
   };
 
   const handleBulkVotersByCondition = async (action: 'ASSIGN' | 'REMOVE') => {
     if (!selectedAudition) return;
+    const targetGrades =
+      selectedGrades.length > 0 ? selectedGrades : availableGrades;
+    const targetEnrollmentYears = Array.from(
+      new Set(
+        visibleUsers
+          .filter((u) =>
+            targetGrades.includes(calculateGrade(u.enrollmentYear)),
+          )
+          .map((u) => u.enrollmentYear),
+      ),
+    );
+    if (targetEnrollmentYears.length === 0) {
+      showToast('対象となる部員（1〜3回生）がいません');
+      return;
+    }
     const res = await apiJson<{ affectedCount: number }>(
       `/api/admin/auditions/${selectedAudition.id}/voters/bulk`,
       {
         method: 'POST',
         body: JSON.stringify({
           mode: 'BY_CONDITION',
-          enrollmentYears: selectedYears.length > 0 ? selectedYears : undefined,
+          enrollmentYears: targetEnrollmentYears,
           performerFilter,
           permissionType: bulkPermType,
           action,
@@ -255,10 +324,12 @@ export function AdminSetupPage({
       },
     );
     await loadContext();
+    const permLabel =
+      bulkPermType === 'SCORE_AND_COMMENT' ? '採点＋コメント' : 'コメントのみ';
     showToast(
       action === 'ASSIGN'
-        ? `${res.affectedCount}名に参加権限（${bulkPermType}）を一括付与しました`
-        : `${res.affectedCount}名の参加権限を一括解除しました`,
+        ? `${res.affectedCount}名に採点・コメント義務（${permLabel}）を一括設定しました`
+        : `${res.affectedCount}名の採点・コメント義務を一括解除しました`,
     );
   };
 
@@ -295,7 +366,7 @@ export function AdminSetupPage({
     {
       id: 'setup-voters',
       step: 2,
-      label: '採点参加権限',
+      label: '採点・コメント義務設定',
       icon: UserCheck,
       badge: `${currentVoters.length}名`,
     },
@@ -386,7 +457,7 @@ export function AdminSetupPage({
             })}
           </nav>
 
-          <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-6 items-start">
+          <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 items-start">
             {/* デスクトップ用 左目次 */}
             <aside className="hidden lg:block lg:sticky lg:top-28">
               <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-2 space-y-1">
@@ -476,34 +547,39 @@ export function AdminSetupPage({
                 </div>
               </section>
 
-              {/* 2. 参加者権限一括設定 */}
+              {/* 2. 採点・コメント義務設定 */}
               <section
                 id="setup-voters"
                 className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4"
               >
-                <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
-                  <UserCheck className="h-5 w-5 text-slate-700" />
-                  採点・コメント参加権限（AuditionVoters）一括設定
-                </h2>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-slate-700" />
+                    採点・コメント義務設定
+                  </h2>
+                  <span className="text-xs text-zinc-500">
+                    ※4月基準で1〜3回生のみ表示（4回生以上は自動非表示）
+                  </span>
+                </div>
 
                 <div className="bg-zinc-100 border border-zinc-300 rounded-sm p-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <div className="text-xs font-bold text-zinc-700 mb-1.5">
-                        入部年度で絞り込み（未選択時は全年度）
+                        回生で絞り込み（未選択時は全回生）
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {availableYears.map((yr) => {
-                          const active = selectedYears.includes(yr);
+                        {availableGrades.map((grade) => {
+                          const active = selectedGrades.includes(grade);
                           return (
                             <button
-                              key={yr}
+                              key={grade}
                               type="button"
                               onClick={() =>
-                                setSelectedYears((prev) =>
-                                  prev.includes(yr)
-                                    ? prev.filter((y) => y !== yr)
-                                    : [...prev, yr],
+                                setSelectedGrades((prev) =>
+                                  prev.includes(grade)
+                                    ? prev.filter((g) => g !== grade)
+                                    : [...prev, grade],
                                 )
                               }
                               className={`px-2.5 py-1 rounded-sm text-xs font-semibold border cursor-pointer ${
@@ -512,10 +588,15 @@ export function AdminSetupPage({
                                   : 'bg-zinc-50 text-zinc-700 border-zinc-300'
                               }`}
                             >
-                              {yr}年入部
+                              {grade}回生
                             </button>
                           );
                         })}
+                        {availableGrades.length === 0 && (
+                          <span className="text-xs text-zinc-400">
+                            対象の現役部員がいません
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -543,7 +624,7 @@ export function AdminSetupPage({
 
                     <div>
                       <div className="text-xs font-bold text-zinc-700 mb-1.5">
-                        付与する権限区分
+                        設定する義務区分
                       </div>
                       <select
                         value={bulkPermType}
@@ -562,21 +643,26 @@ export function AdminSetupPage({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => handleBulkVotersByCondition('REMOVE')}
-                      className="px-3.5 py-2 rounded-sm border border-rose-300 text-rose-700 bg-zinc-50 hover:bg-rose-50 text-xs font-bold cursor-pointer"
-                    >
-                      条件に合う部員の権限を解除
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkVotersByCondition('ASSIGN')}
-                      className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
-                    >
-                      条件に合う部員へ一括付与
-                    </button>
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+                    <span className="text-xs font-semibold text-zinc-600">
+                      条件に一致する部員: {bulkMatchedUsers.length}名
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleBulkVotersByCondition('REMOVE')}
+                        className="px-3.5 py-2 rounded-sm border border-rose-300 text-rose-700 bg-zinc-50 hover:bg-rose-50 text-xs font-bold cursor-pointer"
+                      >
+                        条件に合う部員の義務を解除
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkVotersByCondition('ASSIGN')}
+                        className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                      >
+                        条件に合う部員へ一括設定
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -586,14 +672,18 @@ export function AdminSetupPage({
                     <thead>
                       <tr className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
                         <th className="px-3 py-2.5">氏名</th>
-                        <th className="px-3 py-2.5">回生 (入部年度)</th>
-                        <th className="px-3 py-2.5">現在の参加権限</th>
+                        <th className="px-3 py-2.5">回生</th>
+                        <th className="px-3 py-2.5">出演・非出演</th>
+                        <th className="px-3 py-2.5">現在の設定</th>
                         <th className="px-3 py-2.5 text-right">個別変更</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {allUsers.map((u) => {
+                      {visibleUsers.map((u) => {
                         const entry = voterMap.get(u.id);
+                        const grade = calculateGrade(u.enrollmentYear);
+                        const performingBands = performerBandsMap.get(u.id) ?? [];
+                        const isPerformer = performingBands.length > 0;
                         return (
                           <tr key={u.id}>
                             <td className="px-3 py-2.5 font-medium text-zinc-800">
@@ -602,8 +692,30 @@ export function AdminSetupPage({
                                 {u.email}
                               </div>
                             </td>
-                            <td className="px-3 py-2.5 text-zinc-600">
-                              {u.grade}回生 ({u.enrollmentYear})
+                            <td className="px-3 py-2.5 text-zinc-600 whitespace-nowrap">
+                              {grade}回生
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {isPerformer ? (
+                                <div className="space-y-0.5">
+                                  <span className="inline-block px-2 py-0.5 rounded-sm text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                                    出演
+                                    {performingBands.length > 1
+                                      ? ` (${performingBands.length}バンド)`
+                                      : ''}
+                                  </span>
+                                  <div
+                                    className="text-[11px] text-zinc-500 max-w-[180px] truncate"
+                                    title={performingBands.join(' / ')}
+                                  >
+                                    {performingBands.join(' / ')}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="inline-block px-2 py-0.5 rounded-sm text-xs font-semibold bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                  非出演
+                                </span>
+                              )}
                             </td>
                             <td className="px-3 py-2.5">
                               {entry ? (
@@ -620,7 +732,7 @@ export function AdminSetupPage({
                                 </span>
                               ) : (
                                 <span className="text-xs text-zinc-400">
-                                  未登録（対象外）
+                                  未設定（対象外）
                                 </span>
                               )}
                             </td>
@@ -660,6 +772,16 @@ export function AdminSetupPage({
                           </tr>
                         );
                       })}
+                      {visibleUsers.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="px-3 py-6 text-center text-xs text-zinc-500"
+                          >
+                            表示対象の部員（1〜3回生）がいません
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
