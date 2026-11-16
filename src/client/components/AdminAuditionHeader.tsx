@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AlertTriangle, Calendar } from 'lucide-react';
 import {
   AUDITION_STATUS_META,
@@ -9,6 +10,7 @@ interface AdminAuditionHeaderProps {
   auditions: AuditionDto[];
   selectedAuditionId: string;
   onSelectAudition: (id: string) => void;
+  actionSlot?: ReactNode;
 }
 
 export function StatusBadge({ status }: { status: AuditionDto['status'] }) {
@@ -26,6 +28,7 @@ export function AdminAuditionHeader({
   auditions,
   selectedAuditionId,
   onSelectAudition,
+  actionSlot,
 }: AdminAuditionHeaderProps) {
   if (auditions.length === 0) {
     return null;
@@ -57,12 +60,12 @@ export function AdminAuditionHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <select
             aria-label="操作対象のオーディションを選択"
             value={selected?.id ?? ''}
             onChange={(e) => onSelectAudition(e.target.value)}
-            className="w-full sm:w-auto min-w-[280px] rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800 focus:border-slate-700 focus:outline-none focus:ring-0"
+            className="min-w-0 flex-1 sm:flex-initial sm:min-w-[280px] rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800 focus:border-slate-700 focus:outline-none focus:ring-0"
           >
             {sorted.map((aud) => (
               <option key={aud.id} value={aud.id}>
@@ -70,6 +73,7 @@ export function AdminAuditionHeader({
               </option>
             ))}
           </select>
+          {actionSlot}
         </div>
       </div>
 
