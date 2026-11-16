@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CloudOff,
   Eye,
+  FileSpreadsheet,
   Lock,
   Music,
   RefreshCw,
@@ -235,6 +236,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   // 1. 採点受付中のオーディションが存在しない場合
   if (!activeAudition) {
     const preparingAudition = data?.preparingAudition ?? data?.draftAudition ?? null;
+    const latestClosedAudition = data?.latestClosedAudition ?? null;
     const isEntryClosed = preparingAudition?.status === 'ENTRY_CLOSED';
     return (
       <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
@@ -251,15 +253,29 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
               : `現在「${preparingAudition.title}」の出演バンド募集を受付中です。`
             : '採点受付が開始されるまでお待ちください。'}
         </p>
-        {preparingAudition && (
-          <button
-            type="button"
-            onClick={() => onNavigate('wiki')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm transition cursor-pointer"
-          >
-            <Music className="h-4 w-4" />
-            {isEntryClosed ? '登録バンド一覧を見る' : 'バンド登録・編集へ進む'}
-          </button>
+        {(preparingAudition || latestClosedAudition) && (
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            {preparingAudition && (
+              <button
+                type="button"
+                onClick={() => onNavigate('wiki')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm transition cursor-pointer"
+              >
+                <Music className="h-4 w-4" />
+                {isEntryClosed ? '登録バンド一覧を見る' : 'バンド登録・編集へ進む'}
+              </button>
+            )}
+            {latestClosedAudition && (
+              <button
+                type="button"
+                onClick={() => onNavigate('results')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 font-semibold text-sm transition cursor-pointer"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                「{latestClosedAudition.title}」の順位を見る
+              </button>
+            )}
+          </div>
         )}
       </div>
     );

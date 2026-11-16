@@ -79,10 +79,35 @@ export interface CurrentAuditionPayload {
   activeAudition: AuditionDto | null;
   draftAudition: AuditionDto | null;
   preparingAudition: AuditionDto | null;
+  latestClosedAudition?: AuditionDto | null;
   voterEntry: VoterEntryDto | null;
   bands: BandWithMembersDto[];
   ownBandIds: string[];
   myScores: MyScoreDto[];
+}
+
+export interface VoterBandRankingDto {
+  rank: number;
+  isTied: boolean;
+  bandId: string;
+  bandName: string;
+  performanceOrder: number;
+  memberNames: string[];
+  validVoteCount: number;
+  commentCount: number;
+  avgRawTech: number;
+  avgRawCharm: number;
+  avgRawTotal: number;
+  activeAvgNormTech: number;
+  activeAvgNormCharm: number;
+  activePrePenaltyScore: number;
+  appliedPenalty: number;
+  activeFinalScore: number;
+}
+
+export interface VoterResultsResponse {
+  audition: AuditionDto;
+  rankings: VoterBandRankingDto[];
 }
 
 export interface AdminVoterMonitorDto {

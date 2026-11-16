@@ -1,22 +1,9 @@
 import type { ReactNode } from 'react';
-import {
-  Award,
-  ClipboardCheck,
-  FileSpreadsheet,
-  LogOut,
-  Music,
-  Settings,
-  Shield,
-  Users,
-} from 'lucide-react';
+import { Award, LogOut, Shield } from 'lucide-react';
 import type { AuthUserDto } from '../types.ts';
+import { NAV_ITEMS, type AppRoute } from '../routes.ts';
 
-export type AppRoute =
-  | 'scoring'
-  | 'wiki'
-  | 'admin-dashboard'
-  | 'admin-setup'
-  | 'admin-users';
+export type { AppRoute } from '../routes.ts';
 
 interface LayoutProps {
   user: AuthUserDto;
@@ -35,20 +22,7 @@ export function Layout({
 }: LayoutProps) {
   const isAdmin = user.role === 'ADMIN';
 
-  const navItems: Array<{
-    id: AppRoute;
-    label: string;
-    icon: typeof ClipboardCheck;
-    adminOnly?: boolean;
-  }> = [
-      { id: 'scoring', label: '採点', icon: ClipboardCheck },
-      { id: 'wiki', label: 'バンド登録', icon: Music },
-      { id: 'admin-dashboard', label: '集計', icon: FileSpreadsheet, adminOnly: true },
-      { id: 'admin-setup', label: '設定', icon: Settings, adminOnly: true },
-      { id: 'admin-users', label: '部員管理', icon: Users, adminOnly: true },
-    ];
-
-  const visibleNav = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleNav = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-100">
@@ -94,18 +68,32 @@ export function Layout({
               const Icon = item.icon;
               const active = activeRoute === item.id;
               return (
-                <button
+                <a
                   key={item.id}
-                  type="button"
-                  onClick={() => onNavigate(item.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${active
-                    ? 'bg-slate-700 text-white'
-                    : 'text-zinc-300 hover:text-white hover:bg-slate-700'
-                    }`}
+                  href={item.path}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={(e) => {
+                    if (
+                      e.metaKey ||
+                      e.ctrlKey ||
+                      e.shiftKey ||
+                      e.altKey ||
+                      e.button !== 0
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    onNavigate(item.id);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${
+                    active
+                      ? 'bg-slate-600 text-white'
+                      : 'text-zinc-300 hover:text-white hover:bg-slate-600/60'
+                  }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
-                </button>
+                </a>
               );
             })}
           </nav>

@@ -379,5 +379,54 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     };
     expect(usersBody.users.some((u) => u.id === 'u-unregistered')).toBe(false);
   });
+
+  it('VOTERはCLOSEDのオーディションのみ集計一覧と順位を閲覧でき、個別採点詳細や非CLOSED回は閲覧できない', async () => {
+    const voterCookie = await loginAs('u-voter1');
+
+    // /api/auditions/closed は CLOSED のみ返す
+    const closedListRes = await app.request('/api/auditions/closed', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(closedListRes.status).toBe(200);
+    const closedListBody = (await closedListRes.json()) as {
+      auditions: Array<{ id: string; status: string }>;
+    };
+    expect(closedListBody.auditions.length).toBeGreaterThan(0);
+    expect(closedListBody.auditions.every((a) => a.status === 'CLOSED')).toBe(true);
+    expect(closedListBody.auditions.some((a) => a.id === 'aud-2026-summer')).toBe(true);
+
+    // CLOSED オーディションの順位閲覧は 200 かつ個別評価詳細を含まない
+    const closedResultsRes = await app.request(
+      '/api/auditions/aud-2026-summer/results',
+      { headers: { Cookie: voterCookie } },
+    );
+    expect(closedResultsRes.status).toBe(200);
+    const closedResultsBody = (await closedResultsRes.json()) as {
+      audition: { id: string; status: string };
+      rankings: Array<{ rank: number; bandName: string; activeFinalScore: number }>;
+      aggregation?: unknown;
+      voteRecords?: unknown;
+      evaluatorStats?: unknown;
+    };
+    expect(closedResultsBody.audition.id).toBe('aud-2026-summer');
+    expect(closedResultsBody.rankings.length).toBeGreaterThan(0);
+    expect(closedResultsBody.rankings[0].rank).toBe(1);
+    expect(closedResultsBody.aggregation).toBeUndefined();
+    expect(closedResultsBody.voteRecords).toBeUndefined();
+    expect(closedResultsBody.evaluatorStats).toBeUndefined();
+
+    // ACTIVE / DRAFT オーディションの結果は 403 で拒否される
+    const activeResultsRes = await app.request(
+      '/api/auditions/aud-2026-winter/results',
+      { headers: { Cookie: voterCookie } },
+    );
+    expect(activeResultsRes.status).toBe(403);
+
+    const draftResultsRes = await app.request(
+      '/api/auditions/aud-2027-spring/results',
+      { headers: { Cookie: voterCookie } },
+    );
+    expect(draftResultsRes.status).toBe(403);
+  });
 });
 

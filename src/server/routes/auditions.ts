@@ -11,7 +11,10 @@ import {
   users,
 } from '../db/schema.ts';
 import { requireAuth } from '../middleware/auth.ts';
-import { loadBandsWithMembers } from '../lib/audition-loader.ts';
+import {
+  loadAuditionAggregation,
+  loadBandsWithMembers,
+} from '../lib/audition-loader.ts';
 import {
   SubmitScoresSchema,
   UpsertBandSchema,
@@ -65,11 +68,19 @@ export const auditionRoutes = new Hono<AppEnv>()
       .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
       .limit(1);
 
+    const [latestClosedAudition] = await db
+      .select()
+      .from(auditions)
+      .where(eq(auditions.status, 'CLOSED'))
+      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+      .limit(1);
+
     if (!activeAudition) {
       return c.json({
         activeAudition: null,
         draftAudition: draftAudition ?? null,
         preparingAudition: preparingAudition ?? null,
+        latestClosedAudition: latestClosedAudition ?? null,
         voterEntry: null,
         bands: [],
         ownBandIds: [],
@@ -114,6 +125,7 @@ export const auditionRoutes = new Hono<AppEnv>()
       activeAudition,
       draftAudition: draftAudition ?? null,
       preparingAudition: preparingAudition ?? null,
+      latestClosedAudition: latestClosedAudition ?? null,
       voterEntry: voterEntry ?? null,
       bands: bandsWithMembers,
       ownBandIds,
@@ -128,6 +140,56 @@ export const auditionRoutes = new Hono<AppEnv>()
       .where(inArray(auditions.status, ['DRAFT', 'ENTRY_CLOSED']))
       .orderBy(desc(auditions.eventDate), desc(auditions.createdAt));
     return c.json({ auditions: draftAuditions });
+  })
+  .get('/closed', async (c) => {
+    const db = c.get('db');
+    const closedAuditions = await db
+      .select()
+      .from(auditions)
+      .where(eq(auditions.status, 'CLOSED'))
+      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt));
+    return c.json({ auditions: closedAuditions });
+  })
+  .get('/:id/results', async (c) => {
+    const db = c.get('db');
+    const auditionId = c.req.param('id');
+
+    const loaded = await loadAuditionAggregation(db, auditionId);
+    if (!loaded) {
+      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    }
+
+    if (loaded.audition.status !== 'CLOSED') {
+      return c.json(
+        {
+          error:
+            '集計結果はステータスが「採点終了・集計」のオーディションのみ閲覧できます。',
+        },
+        403,
+      );
+    }
+
+    return c.json({
+      audition: loaded.audition,
+      rankings: loaded.aggregation.bandResults.map((b) => ({
+        rank: b.rank,
+        isTied: b.isTied,
+        bandId: b.bandId,
+        bandName: b.bandName,
+        performanceOrder: b.performanceOrder,
+        memberNames: b.memberNames,
+        validVoteCount: b.validVoteCount,
+        commentCount: b.commentCount,
+        avgRawTech: b.avgRawTech,
+        avgRawCharm: b.avgRawCharm,
+        avgRawTotal: b.avgRawTotal,
+        activeAvgNormTech: b.activeAvgNormTech,
+        activeAvgNormCharm: b.activeAvgNormCharm,
+        activePrePenaltyScore: b.activePrePenaltyScore,
+        appliedPenalty: b.appliedPenalty,
+        activeFinalScore: b.activeFinalScore,
+      })),
+    });
   })
   .get('/:id/bands', async (c) => {
     const db = c.get('db');
