@@ -183,11 +183,10 @@ export function AdminDashboardPage({
                   key={m.id}
                   type="button"
                   onClick={() => handleUpdateSettings({ aggregationMethod: m.id })}
-                  className={`px-3 py-2 rounded-sm text-xs font-bold border transition cursor-pointer ${
-                    audition.aggregationMethod === m.id
-                      ? 'bg-slate-700 text-white border-slate-700'
-                      : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                  }`}
+                  className={`px-3 py-2 rounded-sm text-xs font-bold border transition cursor-pointer ${audition.aggregationMethod === m.id
+                    ? 'bg-slate-700 text-white border-slate-700'
+                    : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                    }`}
                 >
                   {m.label}
                 </button>
@@ -292,33 +291,30 @@ export function AdminDashboardPage({
         <button
           type="button"
           onClick={() => setActiveTab('ranking')}
-          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${
-            activeTab === 'ranking'
-              ? 'bg-slate-700 text-white'
-              : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
-          }`}
+          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'ranking'
+            ? 'bg-slate-700 text-white'
+            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
+            }`}
         >
-          ランキング・ペナルティ ({bandResults.length})
+          ランキング ({bandResults.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('voters')}
-          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${
-            activeTab === 'voters'
-              ? 'bg-slate-700 text-white'
-              : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
-          }`}
+          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'voters'
+            ? 'bg-slate-700 text-white'
+            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
+            }`}
         >
-          提出状況・未提出者 ({votersData?.summary.unsubmittedCount ?? 0}名未提出)
+          提出状況 ({votersData?.summary.unsubmittedCount ?? 0}名未提出)
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('evaluators')}
-          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${
-            activeTab === 'evaluators'
-              ? 'bg-slate-700 text-white'
-              : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
-          }`}
+          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'evaluators'
+            ? 'bg-slate-700 text-white'
+            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
+            }`}
         >
           審査員別 基準値・補正係数 ({evaluatorStats.length})
         </button>
@@ -376,13 +372,12 @@ export function AdminDashboardPage({
                   <tr key={b.bandId} className="hover:bg-zinc-100/80">
                     <td className="px-3 py-3 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-sm font-extrabold text-xs ${
-                          b.rank === 1
-                            ? 'bg-amber-50 text-amber-900 border border-amber-300'
-                            : b.rank <= 3
-                              ? 'bg-slate-100 text-slate-800'
-                              : 'bg-zinc-100 text-zinc-700'
-                        }`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-sm font-extrabold text-xs ${b.rank === 1
+                          ? 'bg-amber-50 text-amber-900 border border-amber-300'
+                          : b.rank <= 3
+                            ? 'bg-slate-100 text-slate-800'
+                            : 'bg-zinc-100 text-zinc-700'
+                          }`}
                       >
                         {b.rank}位{b.isTied ? ' (同率)' : ''}
                       </span>
@@ -552,11 +547,10 @@ export function AdminDashboardPage({
                       <td className="px-4 py-3 text-zinc-600">{v.grade}回生</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${
-                            v.permissionType === 'SCORE_AND_COMMENT'
-                              ? 'bg-slate-100 text-slate-700'
-                              : 'bg-amber-50 text-amber-800'
-                          }`}
+                          className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${v.permissionType === 'SCORE_AND_COMMENT'
+                            ? 'bg-slate-100 text-slate-700'
+                            : 'bg-amber-50 text-amber-800'
+                            }`}
                         >
                           {v.permissionType === 'SCORE_AND_COMMENT'
                             ? '採点＋コメント'
