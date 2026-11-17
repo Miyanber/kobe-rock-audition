@@ -26,7 +26,7 @@ export const CreateAuditionSchema = z.object({
   deadline: z.string().nullable().optional(),
   isPenaltyEnabled: z.boolean().optional().default(true),
   aggregationMethod: AggregationMethodSchema.optional().default('DIFF_CORRECTION'),
-  standardDiff: z.number().positive().max(100).optional().default(10),
+  standardDiff: z.number().positive().max(100).optional().default(100),
 });
 
 export const UpdateAuditionSchema = z.object({

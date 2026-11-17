@@ -42,7 +42,6 @@ export function AdminDashboardPage({
   );
   const [onlyUnsubmitted, setOnlyUnsubmitted] = useState(false);
   const [penaltyDrafts, setPenaltyDrafts] = useState<Record<string, string>>({});
-  const [standardDiffDraft, setStandardDiffDraft] = useState('10');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
@@ -68,7 +67,6 @@ export function AdminDashboardPage({
 
       setResults(resData);
       setVotersData(votersRes);
-      setStandardDiffDraft(String(resData.audition.standardDiff));
 
       const pMap: Record<string, string> = {};
       for (const b of resData.bands) {
@@ -158,7 +156,7 @@ export function AdminDashboardPage({
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
                 <Sliders className="h-4 w-4 text-slate-700" />
-                集計アルゴリズム・ペナルティ運用設定
+                集計アルゴリズム設定
               </h2>
               <button
                 type="button"
@@ -197,32 +195,7 @@ export function AdminDashboardPage({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-300">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-zinc-600">
-                  点差補正定数:
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  step={1}
-                  value={standardDiffDraft}
-                  onChange={(e) => setStandardDiffDraft(e.target.value)}
-                  className="w-16 rounded-sm border border-zinc-300 px-2 py-1 text-xs font-bold text-right"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const num = Number(standardDiffDraft);
-                    if (num > 0) void handleUpdateSettings({ standardDiff: num });
-                  }}
-                  className="px-2.5 py-1 rounded-sm bg-slate-700 text-white text-xs font-semibold cursor-pointer"
-                >
-                  定数変更
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -628,7 +601,7 @@ export function AdminDashboardPage({
                   <th className="px-4 py-3 text-right">最低点(MIN)</th>
                   <th className="px-4 py-3 text-right">点差(Diff)</th>
                   <th className="px-4 py-3 text-right">
-                    補正係数 ({audition?.standardDiff ?? 10}/Diff)
+                    補正係数 ({audition?.standardDiff ?? 100}/Diff)
                   </th>
                   <th className="px-4 py-3 text-right">素点平均</th>
                   <th className="px-4 py-3 text-right">標準偏差</th>
