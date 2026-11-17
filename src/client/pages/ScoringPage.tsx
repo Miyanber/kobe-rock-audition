@@ -6,12 +6,11 @@ import {
   CloudOff,
   Eye,
   FileSpreadsheet,
-  Lock,
   Music,
+  Pencil,
   RefreshCw,
   Save,
   Send,
-  Unlock,
   Wifi,
   X,
 } from 'lucide-react';
@@ -303,9 +302,9 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   }
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-3 pb-20">
       {/* 開催回情報 & 提出ステータスヘッダー */}
-      <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4">
+      <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-3 sm:p-4 space-y-2.5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -409,7 +408,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       />
 
       {/* タイムテーブル & 採点カード一覧 */}
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {data?.bands.map((band) => {
           const isOwn = ownBandSet.has(band.id);
 
@@ -417,25 +416,25 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
             return (
               <div
                 key={band.id}
-                className="bg-zinc-200/60 border border-zinc-300 text-zinc-600 rounded-sm p-4 sm:p-5"
+                className="bg-zinc-200/60 border border-zinc-300 text-zinc-600 rounded-sm p-2.5 sm:p-3"
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex items-center justify-center h-7 w-7 rounded-sm bg-zinc-200 text-zinc-700 font-bold text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex items-center justify-center h-6 w-6 rounded-sm bg-zinc-200 text-zinc-700 font-bold text-xs shrink-0">
                       #{band.performanceOrder}
                     </span>
-                    <div>
-                      <h3 className="font-bold text-zinc-700 text-base">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-zinc-700 text-sm leading-tight truncate">
                         {band.name}
                       </h3>
-                      <p className="text-xs text-zinc-500">
-                        メンバー: {band.members.map((m) => m.name).join(' / ') || '未設定'}
+                      <p className="text-[11px] text-zinc-500 truncate">
+                        出演: {band.members.map((m) => m.name).join(' / ') || '未設定'}
                       </p>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs bg-zinc-200 text-zinc-600">
-                    <Ban className="h-3.5 w-3.5" />
-                    自バンドのため採点対象外（自動除外）
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] bg-zinc-200 text-zinc-600 shrink-0">
+                    <Ban className="h-3 w-3" />
+                    自バンド（対象外）
                   </span>
                 </div>
               </div>
@@ -464,230 +463,227 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
           return (
             <div
               key={band.id}
-              className={`bg-zinc-50 border rounded-sm p-4 sm:p-5 transition ${
+              className={`bg-zinc-50 border rounded-sm p-2.5 sm:p-3.5 transition ${
                 draft.locked
-                  ? 'border-slate-300 bg-slate-100'
+                  ? 'border-slate-300 bg-slate-100/80'
                   : isCompleted
                     ? 'border-emerald-300'
                     : 'border-zinc-300'
               }`}
             >
               {/* カードヘッダー */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3.5 border-b border-zinc-300">
-                <div className="flex items-start gap-3">
-                  <span className="inline-flex items-center justify-center h-8 w-8 rounded-sm bg-slate-700 text-white font-bold text-sm shrink-0">
+              <div
+                className={`flex items-start justify-between gap-2 ${
+                  draft.locked ? '' : 'pb-2 border-b border-zinc-200'
+                }`}
+              >
+                <div className="flex items-start gap-2 min-w-0">
+                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-sm bg-slate-700 text-white font-bold text-xs shrink-0 mt-0.5">
                     {band.performanceOrder}
                   </span>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-zinc-800 text-base sm:text-lg">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="font-bold text-zinc-800 text-sm sm:text-base leading-tight">
                         {band.name}
                       </h3>
                       {draft.dirty ? (
-                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-amber-50 text-amber-800">
+                        <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-amber-50 text-amber-800">
                           未保存の下書き
                         </span>
                       ) : isCompleted ? (
-                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-emerald-50 text-emerald-800">
+                        <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-emerald-50 text-emerald-800">
                           保存済
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-zinc-100 text-zinc-600">
+                        <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-zinc-100 text-zinc-600">
                           未入力
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      出演メンバー:{' '}
-                      {band.members.map((m) => `${m.name}(${m.grade}回)`).join(', ') ||
-                        '未登録'}
+                    <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
+                      出演: {band.members.map((m) => m.name).join(' / ') || '未登録'}
                     </p>
                   </div>
                 </div>
 
-                {/* 誤操作防止ロックトグル & 合計点表示 */}
-                <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                {/* 合計点(編集時) & 編集ボタン(保存済折りたたみ時) */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!draft.locked && !isCommentOnly && (
+                    <div className="px-2 py-1 rounded-sm bg-slate-700 text-white text-xs font-bold tabular-nums whitespace-nowrap">
+                      合計 {total !== null ? total : '--'}
+                      <span className="text-[10px] font-normal text-zinc-300">
+                        /100
+                      </span>
+                    </div>
+                  )}
+
+                  {draft.locked && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateDraft(band.id, { locked: false }, false)
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      編集
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {draft.locked ? (
+                /* 保存済折りたたみ表示（魅力点・技術点・合計点＋小文字コメント） */
+                <div className="mt-2 pt-1.5 border-t border-zinc-200/80 space-y-1.5">
                   {!isCommentOnly && (
-                    <div className="px-3.5 py-1.5 rounded-sm bg-slate-700 text-white text-center min-w-[92px]">
-                      <div className="text-[10px] text-zinc-300 leading-none">
-                        合計点
-                      </div>
-                      <div className="text-lg font-extrabold leading-tight tabular-nums">
-                        {total !== null ? total : '--'}
-                        <span className="text-xs font-normal text-zinc-400">
+                    <div className="flex items-center gap-1.5 flex-wrap text-xs tabular-nums">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-white border border-zinc-300 text-zinc-700 font-medium">
+                        魅力 <strong className="text-zinc-900">{charm ?? '--'}</strong>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-white border border-zinc-300 text-zinc-700 font-medium">
+                        技術 <strong className="text-zinc-900">{tech ?? '--'}</strong>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-slate-700 text-white font-bold">
+                        合計 {total !== null ? total : '--'}
+                        <span className="text-[10px] font-normal text-zinc-300">
                           /100
                         </span>
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-zinc-600 leading-snug whitespace-pre-wrap break-words">
+                    {draft.comment.trim() || '（コメント未入力）'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* 点数入力欄 (SCORE_AND_COMMENT のみ表示) */}
+                  {!isCommentOnly && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 py-2">
+                      {/* 魅力点 (0-50) */}
+                      <div className="bg-zinc-100 rounded-sm px-2.5 py-2 border border-zinc-300">
+                        <div className="flex items-center justify-between gap-2">
+                          <label
+                            htmlFor={`charm-${band.id}`}
+                            className="text-xs font-bold text-zinc-800"
+                          >
+                            魅力点 <span className="font-normal text-zinc-500">(0〜50)</span>
+                          </label>
+                          <input
+                            id={`charm-${band.id}`}
+                            type="number"
+                            min={0}
+                            max={50}
+                            step={1}
+                            value={charm ?? ''}
+                            placeholder="0-50"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                updateDraft(band.id, { charmScore: null });
+                              } else {
+                                const num = Math.max(0, Math.min(50, Number(val)));
+                                updateDraft(band.id, { charmScore: num });
+                              }
+                            }}
+                            className="w-16 text-right font-bold text-sm rounded-sm border border-zinc-300 bg-zinc-50 px-1.5 py-0.5"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={50}
+                          step={1}
+                          value={charm ?? 25}
+                          onChange={(e) =>
+                            updateDraft(band.id, { charmScore: Number(e.target.value) })
+                          }
+                          className="w-full h-2 mt-1.5 cursor-pointer block"
+                        />
+                      </div>
+
+                      {/* 技術点 (0-50) */}
+                      <div className="bg-zinc-100 rounded-sm px-2.5 py-2 border border-zinc-300">
+                        <div className="flex items-center justify-between gap-2">
+                          <label
+                            htmlFor={`tech-${band.id}`}
+                            className="text-xs font-bold text-zinc-800"
+                          >
+                            技術点 <span className="font-normal text-zinc-500">(0〜50)</span>
+                          </label>
+                          <input
+                            id={`tech-${band.id}`}
+                            type="number"
+                            min={0}
+                            max={50}
+                            step={1}
+                            value={tech ?? ''}
+                            placeholder="0-50"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                updateDraft(band.id, { techScore: null });
+                              } else {
+                                const num = Math.max(0, Math.min(50, Number(val)));
+                                updateDraft(band.id, { techScore: num });
+                              }
+                            }}
+                            className="w-16 text-right font-bold text-sm rounded-sm border border-zinc-300 bg-zinc-50 px-1.5 py-0.5"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={50}
+                          step={1}
+                          value={tech ?? 25}
+                          onChange={(e) =>
+                            updateDraft(band.id, { techScore: Number(e.target.value) })
+                          }
+                          className="w-full h-2 mt-1.5 cursor-pointer block"
+                        />
                       </div>
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateDraft(band.id, { locked: !draft.locked }, false)
-                    }
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs font-semibold border transition cursor-pointer ${
-                      draft.locked
-                        ? 'bg-slate-700 text-white border-slate-700'
-                        : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                    title="スマホスクロール時の誤操作防止ロック"
-                  >
-                    {draft.locked ? (
-                      <>
-                        <Lock className="h-3.5 w-3.5" />
-                        ロック中
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="h-3.5 w-3.5" />
-                        編集可
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* 点数入力欄 (SCORE_AND_COMMENT のみ表示) */}
-              {!isCommentOnly && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                  {/* 魅力点 (0-50) */}
-                  <div className="bg-zinc-100 rounded-sm p-3.5 border border-zinc-300 space-y-2.5">
+                  {/* 定性コメント */}
+                  <div className="space-y-1 pt-1">
                     <div className="flex items-center justify-between">
                       <label
-                        htmlFor={`charm-${band.id}`}
-                        className="text-sm font-bold text-zinc-800"
+                        htmlFor={`comment-${band.id}`}
+                        className="text-xs font-bold text-zinc-800"
                       >
-                        魅力点（0〜50）
+                        講評コメント <span className="text-rose-500">*必須</span>
                       </label>
-                      <input
-                        id={`charm-${band.id}`}
-                        type="number"
-                        min={0}
-                        max={50}
-                        step={1}
-                        disabled={draft.locked}
-                        value={charm ?? ''}
-                        placeholder="0-50"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '') {
-                            updateDraft(band.id, { charmScore: null });
-                          } else {
-                            const num = Math.max(0, Math.min(50, Number(val)));
-                            updateDraft(band.id, { charmScore: num });
-                          }
-                        }}
-                        className="w-20 text-right font-bold text-base rounded-sm border border-zinc-300 bg-zinc-50 px-2.5 py-1 disabled:bg-zinc-100 disabled:text-zinc-500"
-                      />
+                      <span className="text-[11px] text-zinc-400">
+                        {draft.comment.length} 文字
+                      </span>
                     </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={50}
-                      step={1}
-                      disabled={draft.locked}
-                      value={charm ?? 25}
+                    <textarea
+                      id={`comment-${band.id}`}
+                      rows={2}
+                      value={draft.comment}
                       onChange={(e) =>
-                        updateDraft(band.id, { charmScore: Number(e.target.value) })
+                        updateDraft(band.id, { comment: e.target.value })
                       }
-                      className="w-full h-2.5 cursor-pointer disabled:opacity-50"
+                      placeholder="演奏・表現・アレンジなどについてのコメントを入力..."
+                      className="w-full rounded-sm border border-zinc-300 px-2.5 py-1.5 text-sm leading-snug focus:border-slate-700 focus:outline-none focus:ring-0"
                     />
-                    <div className="flex justify-between text-[11px] text-zinc-400">
-                      <span>0</span>
-                      <span>25</span>
-                      <span>50</span>
-                    </div>
                   </div>
 
-                  {/* 技術点 (0-50) */}
-                  <div className="bg-zinc-100 rounded-sm p-3.5 border border-zinc-300 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label
-                        htmlFor={`tech-${band.id}`}
-                        className="text-sm font-bold text-zinc-800"
-                      >
-                        技術点（0〜50）
-                      </label>
-                      <input
-                        id={`tech-${band.id}`}
-                        type="number"
-                        min={0}
-                        max={50}
-                        step={1}
-                        disabled={draft.locked}
-                        value={tech ?? ''}
-                        placeholder="0-50"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '') {
-                            updateDraft(band.id, { techScore: null });
-                          } else {
-                            const num = Math.max(0, Math.min(50, Number(val)));
-                            updateDraft(band.id, { techScore: num });
-                          }
-                        }}
-                        className="w-20 text-right font-bold text-base rounded-sm border border-zinc-300 bg-zinc-50 px-2.5 py-1 disabled:bg-zinc-100 disabled:text-zinc-500"
-                      />
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={50}
-                      step={1}
-                      disabled={draft.locked}
-                      value={tech ?? 25}
-                      onChange={(e) =>
-                        updateDraft(band.id, { techScore: Number(e.target.value) })
-                      }
-                      className="w-full h-2.5 cursor-pointer disabled:opacity-50"
-                    />
-                    <div className="flex justify-between text-[11px] text-zinc-400">
-                      <span>0</span>
-                      <span>25</span>
-                      <span>50</span>
-                    </div>
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={savingBandId === band.id}
+                      onClick={() => handleSaveSingleBand(band.id, band.name)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingBandId === band.id ? '保存中...' : '採点を保存'}
+                    </button>
                   </div>
-                </div>
+                </>
               )}
-
-              {/* 定性コメント */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor={`comment-${band.id}`}
-                    className="text-sm font-bold text-zinc-800"
-                  >
-                    講評コメント <span className="text-rose-500">*必須</span>
-                  </label>
-                  <span className="text-xs text-zinc-400">
-                    {draft.comment.length} 文字
-                  </span>
-                </div>
-                <textarea
-                  id={`comment-${band.id}`}
-                  rows={3}
-                  disabled={draft.locked}
-                  value={draft.comment}
-                  onChange={(e) =>
-                    updateDraft(band.id, { comment: e.target.value })
-                  }
-                  placeholder="演奏・表現・アレンジなどについてのコメントを入力してください..."
-                  className="w-full rounded-sm border border-zinc-300 px-3.5 py-2.5 text-sm focus:border-slate-700 focus:outline-none focus:ring-0 disabled:bg-zinc-100 disabled:text-zinc-500"
-                />
-              </div>
-
-              <div className="mt-3 flex justify-end">
-                <button
-                  type="button"
-                  disabled={savingBandId === band.id}
-                  onClick={() => handleSaveSingleBand(band.id, band.name)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold transition disabled:opacity-50 cursor-pointer"
-                >
-                  <Save className="h-4 w-4" />
-                  {savingBandId === band.id ? '保存中...' : 'このバンドを保存'}
-                </button>
-              </div>
             </div>
           );
         })}
