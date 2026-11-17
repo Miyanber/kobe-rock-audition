@@ -36,7 +36,7 @@ export function AdminDashboardPage({
     summary: { totalVoters: number; submittedCount: number; unsubmittedCount: number };
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showComparison, setShowComparison] = useState(true);
+  const [showComparison, setShowComparison] = useState(false);
   const [activeTab, setActiveTab] = useState<'ranking' | 'evaluators' | 'voters'>(
     'ranking',
   );
@@ -232,7 +232,7 @@ export function AdminDashboardPage({
                     }
                     className="h-4 w-4 rounded border-zinc-300 text-slate-700"
                   />
-                  ペナルティ減点を有効化 (is_penalty_enabled)
+                  ペナルティ減点を有効化
                 </label>
 
                 <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 cursor-pointer">
@@ -377,7 +377,9 @@ export function AdminDashboardPage({
                       (魅力/技術/計)
                     </span>
                   </th>
-                  <th className="px-3 py-3 whitespace-nowrap">ペナルティ減点</th>
+                  {audition?.isPenaltyEnabled && (
+                    <th className="px-3 py-3 whitespace-nowrap">ペナルティ減点</th>
+                  )}
                   <th className="px-3 py-3 text-right whitespace-nowrap bg-slate-100 text-slate-800">
                     最終スコア
                   </th>
@@ -445,36 +447,33 @@ export function AdminDashboardPage({
                         {b.activeAvgNormTech.toFixed(1)}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.5}
-                          value={penaltyDrafts[b.bandId] ?? '0'}
-                          onChange={(e) =>
-                            setPenaltyDrafts((prev) => ({
-                              ...prev,
-                              [b.bandId]: e.target.value,
-                            }))
-                          }
-                          className="w-16 rounded-sm border border-zinc-300 px-2 py-1 text-right text-xs font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSavePenalty(b.bandId, b.bandName)}
-                          className="px-2 py-1 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-[11px] font-semibold cursor-pointer"
-                        >
-                          適用
-                        </button>
-                      </div>
-                      {!audition?.isPenaltyEnabled && b.penaltyDeduction > 0 && (
-                        <div className="text-[10px] text-amber-600 mt-0.5">
-                          ※制度無効中（減点なし）
+                    {audition?.isPenaltyEnabled && (
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.5}
+                            value={penaltyDrafts[b.bandId] ?? '0'}
+                            onChange={(e) =>
+                              setPenaltyDrafts((prev) => ({
+                                ...prev,
+                                [b.bandId]: e.target.value,
+                              }))
+                            }
+                            className="w-16 rounded-sm border border-zinc-300 px-2 py-1 text-right text-xs font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSavePenalty(b.bandId, b.bandName)}
+                            className="px-2 py-1 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-[11px] font-semibold cursor-pointer"
+                          >
+                            適用
+                          </button>
                         </div>
-                      )}
-                    </td>
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-right font-mono bg-slate-100">
                       <span className="text-base font-extrabold text-slate-800">
                         {b.activeFinalScore.toFixed(2)}
@@ -498,7 +497,11 @@ export function AdminDashboardPage({
                 {bandResults.length === 0 && (
                   <tr>
                     <td
-                      colSpan={showComparison ? 11 : 8}
+                      colSpan={
+                        7 +
+                        (audition?.isPenaltyEnabled ? 1 : 0) +
+                        (showComparison ? 3 : 0)
+                      }
                       className="px-4 py-8 text-center text-zinc-500"
                     >
                       バンドが登録されていません

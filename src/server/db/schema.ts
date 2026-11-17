@@ -37,7 +37,7 @@ export const auditions = sqliteTable(
       .default('DRAFT'),
     isPenaltyEnabled: integer('is_penalty_enabled', { mode: 'boolean' })
       .notNull()
-      .default(true),
+      .default(false),
     aggregationMethod: text('aggregation_method', {
       enum: ['DIFF_CORRECTION', 'Z_SCORE', 'RAW_AVERAGE'],
     })
