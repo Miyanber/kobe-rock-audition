@@ -43,7 +43,6 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBandId, setEditingBandId] = useState<string | null>(null);
   const [bandName, setBandName] = useState('');
-  const [performanceOrder, setPerformanceOrder] = useState(1);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [saving, setSaving] = useState(false);
@@ -128,13 +127,8 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
   }, [allUsers, memberSearch]);
 
   const openCreateModal = () => {
-    const nextOrder =
-      bands.length > 0
-        ? Math.max(...bands.map((b) => b.performanceOrder)) + 1
-        : 1;
     setEditingBandId(null);
     setBandName('');
-    setPerformanceOrder(nextOrder);
     setSelectedMemberIds([user.id]);
     setMemberSearch('');
     setModalOpen(true);
@@ -143,7 +137,6 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
   const openEditModal = (band: BandWithMembersDto) => {
     setEditingBandId(band.id);
     setBandName(band.name);
-    setPerformanceOrder(band.performanceOrder);
     setSelectedMemberIds(band.members.map((m) => m.userId));
     setMemberSearch('');
     setModalOpen(true);
@@ -164,7 +157,6 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
     try {
       const payload = {
         name: bandName.trim(),
-        performanceOrder: Number(performanceOrder),
         memberUserIds: selectedMemberIds,
       };
       if (editingBandId) {
@@ -417,35 +409,18 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
             </div>
 
             <form onSubmit={handleSubmitBand} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div className="sm:col-span-3 space-y-1">
-                  <label className="block text-xs font-bold text-zinc-700">
-                    バンド名 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={bandName}
-                    onChange={(e) => setBandName(e.target.value)}
-                    placeholder="例: The Rokko Distortion"
-                    className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none focus:ring-0"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-zinc-700">
-                    出演順 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    required
-                    value={performanceOrder}
-                    onChange={(e) => setPerformanceOrder(Number(e.target.value))}
-                    className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-zinc-700">
+                  バンド名 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={bandName}
+                  onChange={(e) => setBandName(e.target.value)}
+                  placeholder="例: The Rokko Distortion"
+                  className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none focus:ring-0"
+                />
               </div>
 
               {/* メンバー選択（部員マスタ検索） */}

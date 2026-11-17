@@ -44,8 +44,12 @@ export const UpdateAuditionStatusSchema = z.object({
 
 export const UpsertBandSchema = z.object({
   name: z.string().trim().min(1, 'バンド名を入力してください').max(100),
-  performanceOrder: z.number().int().min(1).max(999),
+  performanceOrder: z.number().int().min(1).max(999).optional(),
   memberUserIds: z.array(z.string().min(1)).default([]),
+});
+
+export const ReorderBandsSchema = z.object({
+  bandIds: z.array(z.string().min(1)).min(1, '並び替え対象のバンドがありません'),
 });
 
 export const UpdatePenaltySchema = z.object({

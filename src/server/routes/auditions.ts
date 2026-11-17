@@ -241,13 +241,26 @@ export const auditionRoutes = new Hono<AppEnv>()
       );
     }
 
+    let performanceOrder = body.performanceOrder;
+    if (performanceOrder === undefined) {
+      const existingBands = await db
+        .select({ performanceOrder: bands.performanceOrder })
+        .from(bands)
+        .where(eq(bands.auditionId, auditionId));
+      const maxOrder = existingBands.reduce(
+        (max, b) => Math.max(max, b.performanceOrder),
+        0,
+      );
+      performanceOrder = maxOrder + 1;
+    }
+
     const now = Date.now();
     const bandId = crypto.randomUUID();
     await db.insert(bands).values({
       id: bandId,
       auditionId,
       name: body.name,
-      performanceOrder: body.performanceOrder,
+      performanceOrder,
       penaltyDeduction: 0,
       updatedByUserId: user.id,
       createdAt: now,
@@ -310,7 +323,7 @@ export const auditionRoutes = new Hono<AppEnv>()
       .update(bands)
       .set({
         name: body.name,
-        performanceOrder: body.performanceOrder,
+        performanceOrder: body.performanceOrder ?? existingBand.performanceOrder,
         updatedByUserId: user.id,
         updatedAt: now,
       })

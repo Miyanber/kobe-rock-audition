@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   FilePlus2,
+  GripVertical,
   Play,
   Plus,
   RotateCcw,
+  Save,
   Search,
   Trash2,
   Upload,
@@ -33,7 +38,11 @@ interface AdminSetupPageProps {
   onAuditionsChanged: () => Promise<void>;
 }
 
-type SetupSectionId = 'setup-status' | 'setup-voters' | 'setup-bands';
+type SetupSectionId =
+  | 'setup-status'
+  | 'setup-voters'
+  | 'setup-band-order'
+  | 'setup-bands';
 type PerformerFilter = 'ALL' | 'PERFORMERS_ONLY' | 'NON_PERFORMERS_ONLY';
 type PermissionFilter = 'ALL' | 'UNSET' | PermissionType;
 
@@ -90,6 +99,9 @@ export function AdminSetupPage({
   const [allUsers, setAllUsers] = useState<SelectableUserDto[]>([]);
   const [currentVoters, setCurrentVoters] = useState<AdminVoterMonitorDto[]>([]);
   const [auditionBands, setAuditionBands] = useState<BandWithMembersDto[]>([]);
+  const [orderedBandIds, setOrderedBandIds] = useState<string[]>([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [draggingBandId, setDraggingBandId] = useState<string | null>(null);
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
   const [performerFilter, setPerformerFilter] = useState<PerformerFilter>('ALL');
   const [permissionFilter, setPermissionFilter] = useState<PermissionFilter>('ALL');
@@ -123,9 +135,11 @@ export function AdminSetupPage({
       ]);
       setCurrentVoters(votersRes.voters);
       setAuditionBands(bandsRes.bands);
+      setOrderedBandIds(bandsRes.bands.map((b) => b.id));
     } else {
       setCurrentVoters([]);
       setAuditionBands([]);
+      setOrderedBandIds([]);
     }
   };
 
@@ -141,6 +155,7 @@ export function AdminSetupPage({
     const sectionIds: SetupSectionId[] = [
       'setup-status',
       'setup-voters',
+      'setup-band-order',
       'setup-bands',
     ];
     const elements = sectionIds
@@ -378,7 +393,75 @@ export function AdminSetupPage({
       warnings: res.warnings,
     });
     setAuditionBands(res.bands);
+    setOrderedBandIds(res.bands.map((b) => b.id));
     showToast(`${res.insertedCount}件のバンドを一括登録しました`);
+  };
+
+  const orderedBands = useMemo(() => {
+    const bandMap = new Map(auditionBands.map((b) => [b.id, b]));
+    return orderedBandIds
+      .map((id) => bandMap.get(id))
+      .filter((b): b is BandWithMembersDto => b !== undefined);
+  }, [auditionBands, orderedBandIds]);
+
+  const isOrderDirty = useMemo(() => {
+    if (orderedBandIds.length !== auditionBands.length) return false;
+    return orderedBandIds.some((id, idx) => auditionBands[idx]?.id !== id);
+  }, [orderedBandIds, auditionBands]);
+
+  const moveBand = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= orderedBandIds.length) return;
+    setOrderedBandIds((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const handleBandDrop = (targetBandId: string) => {
+    if (!draggingBandId || draggingBandId === targetBandId) {
+      setDraggingBandId(null);
+      return;
+    }
+    setOrderedBandIds((prev) => {
+      const fromIndex = prev.indexOf(draggingBandId);
+      const toIndex = prev.indexOf(targetBandId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setDraggingBandId(null);
+  };
+
+  const resetBandOrder = () => {
+    setOrderedBandIds(auditionBands.map((b) => b.id));
+  };
+
+  const handleSaveBandOrder = async () => {
+    if (!selectedAudition || orderedBandIds.length === 0 || savingOrder) return;
+    setSavingOrder(true);
+    try {
+      const res = await apiJson<{ bands: BandWithMembersDto[] }>(
+        `/api/admin/auditions/${selectedAudition.id}/bands/order`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ bandIds: orderedBandIds }),
+        },
+      );
+      setAuditionBands(res.bands);
+      setOrderedBandIds(res.bands.map((b) => b.id));
+      showToast('バンドの出演順を保存しました');
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : '出演順の保存に失敗しました',
+      );
+    } finally {
+      setSavingOrder(false);
+    }
   };
 
   const handleBulkVoters = async () => {
@@ -475,7 +558,14 @@ export function AdminSetupPage({
       icon: UserCheck,
       badge: `${currentVoters.length}名`,
     },
-    { id: 'setup-bands', step: 3, label: 'バンド一括登録', icon: Upload },
+    {
+      id: 'setup-band-order',
+      step: 3,
+      label: 'バンド出演順の並び替え',
+      icon: ArrowUpDown,
+      badge: `${auditionBands.length}組`,
+    },
+    { id: 'setup-bands', step: 4, label: 'バンド一括登録', icon: Upload },
   ];
 
   return (
@@ -1050,7 +1140,148 @@ export function AdminSetupPage({
                 </div>
               </section>
 
-              {/* 3. バンド・出演順・メンバー CSV一括登録 */}
+              {/* 3. バンド出演順（動画順）の並び替え */}
+              <section
+                id="setup-band-order"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                      <ArrowUpDown className="h-5 w-5 text-slate-700" />
+                      バンド出演順（動画順）の並び替え
+                    </h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      ↑↓ボタンまたはドラッグ＆ドロップでオーディション動画の再生順に並び替え、保存してください（1から連番で反映されます）。
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isOrderDirty && (
+                      <button
+                        type="button"
+                        disabled={savingOrder}
+                        onClick={resetBandOrder}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        元に戻す
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!isOrderDirty || savingOrder || orderedBands.length === 0}
+                      onClick={() => void handleSaveBandOrder()}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Save className="h-4 w-4" />
+                      {savingOrder ? '保存中...' : '出演順を保存'}
+                    </button>
+                  </div>
+                </div>
+
+                {(selectedAudition.status === 'ACTIVE' ||
+                  selectedAudition.status === 'CLOSED') && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-sm px-3.5 py-2.5 text-xs text-amber-900">
+                    現在「{getAuditionStatusLabel(selectedAudition.status)}」のオーディションです。出演順を変更すると、採点画面の表示順や同点時のタイブレーク順位に影響します。
+                  </div>
+                )}
+
+                {isOrderDirty && (
+                  <div className="bg-sky-50 border border-sky-200 rounded-sm px-3.5 py-2 text-xs font-semibold text-sky-900">
+                    未保存の並び替え変更があります。「出演順を保存」を押すと確定します。
+                  </div>
+                )}
+
+                {orderedBands.length === 0 ? (
+                  <div className="rounded-sm border border-dashed border-zinc-300 bg-white p-6 text-center text-xs text-zinc-500">
+                    このオーディションにはまだバンドが登録されていません。
+                  </div>
+                ) : (
+                  <div className="border border-zinc-300 rounded-sm bg-white divide-y divide-zinc-200">
+                    {orderedBands.map((band, index) => {
+                      const newOrder = index + 1;
+                      const orderChanged = band.performanceOrder !== newOrder;
+                      const isDragging = draggingBandId === band.id;
+                      return (
+                        <div
+                          key={band.id}
+                          draggable={!savingOrder}
+                          onDragStart={() => setDraggingBandId(band.id)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            handleBandDrop(band.id);
+                          }}
+                          onDragEnd={() => setDraggingBandId(null)}
+                          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 transition ${
+                            isDragging
+                              ? 'bg-slate-100 opacity-60'
+                              : 'hover:bg-zinc-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              title="ドラッグして並び替え"
+                              className="hidden sm:inline-flex text-zinc-400 cursor-grab active:cursor-grabbing shrink-0"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span
+                                className={`inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-sm text-xs font-bold ${
+                                  orderChanged
+                                    ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                                    : 'bg-slate-100 text-slate-800 border border-slate-200'
+                                }`}
+                              >
+                                {newOrder}
+                              </span>
+                              {orderChanged && (
+                                <span className="text-[11px] text-zinc-400 font-mono">
+                                  (元:{band.performanceOrder})
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-zinc-800 truncate">
+                                {band.name}
+                              </p>
+                              <p className="text-xs text-zinc-500 truncate">
+                                {band.members.length > 0
+                                  ? band.members.map((m) => m.name).join(' / ')
+                                  : 'メンバー未設定'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              disabled={index === 0 || savingOrder}
+                              onClick={() => moveBand(index, -1)}
+                              aria-label={`${band.name} を1つ上へ`}
+                              className="p-1.5 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === orderedBands.length - 1 || savingOrder}
+                              onClick={() => moveBand(index, 1)}
+                              aria-label={`${band.name} を1つ下へ`}
+                              className="p-1.5 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* 4. バンド・出演順・メンバー CSV一括登録 */}
               <section
                 id="setup-bands"
                 className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3"

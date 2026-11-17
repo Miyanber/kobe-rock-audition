@@ -500,5 +500,137 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(listAfterRemove.voters.some((v) => v.userId === 'u-voter1')).toBe(false);
     expect(listAfterRemove.voters.some((v) => v.userId === 'u-comment')).toBe(false);
   });
+
+  it('バンド追加時の出演順自動採番と、管理者による出演順一括並び替え（PUT /bands/order）が正しく動作する', async () => {
+    const voterCookie = await loginAs('u-voter1');
+    const adminCookie = await loginAs('u-admin');
+
+    // DRAFT で performanceOrder を省略してバンドを追加すると末尾(2)に採番される
+    const createRes = await app.request('/api/auditions/aud-2027-spring/bands', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: voterCookie,
+      },
+      body: JSON.stringify({
+        name: 'Auto Order Band',
+        memberUserIds: ['u-voter1'],
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const createdData = (await createRes.json()) as {
+      band: { id: string; performanceOrder: number };
+    };
+    expect(createdData.band.performanceOrder).toBe(2);
+
+    // もう1バンド追加 (3)
+    const createRes2 = await app.request('/api/auditions/aud-2027-spring/bands', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: voterCookie,
+      },
+      body: JSON.stringify({
+        name: 'Third Band',
+        memberUserIds: [],
+      }),
+    });
+    expect(createRes2.status).toBe(201);
+    const createdData2 = (await createRes2.json()) as {
+      band: { id: string; performanceOrder: number };
+    };
+    expect(createdData2.band.performanceOrder).toBe(3);
+
+    // 一般部員は並び替え API を呼べない (403)
+    const forbiddenRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/bands/order',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voterCookie,
+        },
+        body: JSON.stringify({
+          bandIds: [createdData2.band.id, createdData.band.id, 'b-spr-1'],
+        }),
+      },
+    );
+    expect(forbiddenRes.status).toBe(403);
+
+    // 存在しないオーディション (404)
+    const notFoundRes = await app.request(
+      '/api/admin/auditions/aud-nonexistent/bands/order',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({ bandIds: ['b-spr-1'] }),
+      },
+    );
+    expect(notFoundRes.status).toBe(404);
+
+    // バンドIDの重複・過不足 (400)
+    const dupRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/bands/order',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          bandIds: ['b-spr-1', 'b-spr-1', createdData.band.id],
+        }),
+      },
+    );
+    expect(dupRes.status).toBe(400);
+
+    const mismatchRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/bands/order',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          bandIds: ['b-spr-1', createdData.band.id],
+        }),
+      },
+    );
+    expect(mismatchRes.status).toBe(400);
+
+    // 管理者による正常な並び替え
+    const newOrderIds = [createdData2.band.id, 'b-spr-1', createdData.band.id];
+    const reorderRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/bands/order',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({ bandIds: newOrderIds }),
+      },
+    );
+    expect(reorderRes.status).toBe(200);
+    const reorderData = (await reorderRes.json()) as {
+      bands: Array<{ id: string; performanceOrder: number }>;
+    };
+    expect(reorderData.bands.map((b) => b.id)).toEqual(newOrderIds);
+    expect(reorderData.bands.map((b) => b.performanceOrder)).toEqual([1, 2, 3]);
+
+    // GET /bands でも新しい順番で返ること
+    const getBandsRes = await app.request('/api/auditions/aud-2027-spring/bands', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(getBandsRes.status).toBe(200);
+    const getBandsData = (await getBandsRes.json()) as {
+      bands: Array<{ id: string; performanceOrder: number }>;
+    };
+    expect(getBandsData.bands.map((b) => b.id)).toEqual(newOrderIds);
+  });
 });
 

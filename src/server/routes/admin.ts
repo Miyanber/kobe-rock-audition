@@ -25,6 +25,7 @@ import {
   BulkUsersSchema,
   BulkVotersSchema,
   CreateAuditionSchema,
+  ReorderBandsSchema,
   UpdateAuditionSchema,
   UpdateAuditionStatusSchema,
   UpdatePenaltySchema,
@@ -289,6 +290,71 @@ export const adminRoutes = new Hono<AppEnv>()
         warnings,
         bands: updatedBands,
       });
+    },
+  )
+  .put(
+    '/auditions/:id/bands/order',
+    zValidator('json', ReorderBandsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const user = c.get('user')!;
+      const auditionId = c.req.param('id');
+      const { bandIds } = c.req.valid('json');
+
+      const [audition] = await db
+        .select({ id: auditions.id })
+        .from(auditions)
+        .where(eq(auditions.id, auditionId))
+        .limit(1);
+
+      if (!audition) {
+        return c.json({ error: 'オーディションが見つかりません。' }, 404);
+      }
+
+      const existingBands = await db
+        .select({ id: bands.id })
+        .from(bands)
+        .where(eq(bands.auditionId, auditionId));
+
+      const uniqueBandIds = Array.from(new Set(bandIds));
+      if (uniqueBandIds.length !== bandIds.length) {
+        return c.json({ error: 'バンドIDが重複しています。' }, 400);
+      }
+
+      const existingIdSet = new Set(existingBands.map((b) => b.id));
+      if (
+        existingIdSet.size !== uniqueBandIds.length ||
+        uniqueBandIds.some((id) => !existingIdSet.has(id))
+      ) {
+        return c.json(
+          { error: '対象オーディションの登録バンド一覧と一致しません。' },
+          400,
+        );
+      }
+
+      // Cloudflare D1 does not support multi-statement transactions; update atomically in one CASE expression.
+      const now = Date.now();
+      const orderCases = sql.join(
+        uniqueBandIds.map((id, idx) => sql`WHEN ${id} THEN ${idx + 1}`),
+        sql` `,
+      );
+
+      await db
+        .update(bands)
+        .set({
+          performanceOrder: sql`CASE ${bands.id} ${orderCases} ELSE ${bands.performanceOrder} END`,
+          updatedByUserId: user.id,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(bands.auditionId, auditionId),
+            inArray(bands.id, uniqueBandIds),
+          ),
+        );
+
+      const updatedBands = await loadBandsWithMembers(db, auditionId);
+      return c.json({ bands: updatedBands });
     },
   )
   .patch(
