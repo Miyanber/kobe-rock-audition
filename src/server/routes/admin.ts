@@ -474,14 +474,18 @@ export const adminRoutes = new Hono<AppEnv>()
       }
 
       if (body.action === 'REMOVE') {
-        await db
-          .delete(auditionVoters)
-          .where(
-            and(
-              eq(auditionVoters.auditionId, auditionId),
-              inArray(auditionVoters.userId, targetUserIds),
-            ),
-          );
+        const CHUNK_SIZE = 50;
+        for (let i = 0; i < targetUserIds.length; i += CHUNK_SIZE) {
+          const chunk = targetUserIds.slice(i, i + CHUNK_SIZE);
+          await db
+            .delete(auditionVoters)
+            .where(
+              and(
+                eq(auditionVoters.auditionId, auditionId),
+                inArray(auditionVoters.userId, chunk),
+              ),
+            );
+        }
         return c.json({ affectedCount: targetUserIds.length });
       }
 

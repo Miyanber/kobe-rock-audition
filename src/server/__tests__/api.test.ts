@@ -428,5 +428,77 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     );
     expect(draftResultsRes.status).toBe(403);
   });
+
+  it('BY_IDSでの一括権限付与とチャンク分割を伴う一括解除が正常に動作する', async () => {
+    const adminCookie = await loginAs('u-admin');
+
+    // 1) ASSIGN by IDs
+    const assignRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/voters/bulk',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          mode: 'BY_IDS',
+          userIds: ['u-voter1', 'u-comment'],
+          permissionType: 'COMMENT_ONLY',
+          action: 'ASSIGN',
+        }),
+      },
+    );
+    expect(assignRes.status).toBe(200);
+    const assignBody = (await assignRes.json()) as { affectedCount: number };
+    expect(assignBody.affectedCount).toBe(2);
+
+    const listAfterAssignRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/voters',
+      { headers: { Cookie: adminCookie } },
+    );
+    const listAfterAssign = (await listAfterAssignRes.json()) as {
+      voters: Array<{ userId: string; permissionType: string }>;
+    };
+    expect(
+      listAfterAssign.voters.find((v) => v.userId === 'u-voter1')?.permissionType,
+    ).toBe('COMMENT_ONLY');
+    expect(
+      listAfterAssign.voters.find((v) => v.userId === 'u-comment')?.permissionType,
+    ).toBe('COMMENT_ONLY');
+
+    // 2) REMOVE by IDs with > 50 IDs spanning chunk boundary
+    const manyIds = [
+      'u-voter1',
+      ...Array.from({ length: 55 }, (_, idx) => `u-dummy-${idx}`),
+      'u-comment',
+    ];
+    const removeRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/voters/bulk',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          mode: 'BY_IDS',
+          userIds: manyIds,
+          action: 'REMOVE',
+        }),
+      },
+    );
+    expect(removeRes.status).toBe(200);
+
+    const listAfterRemoveRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/voters',
+      { headers: { Cookie: adminCookie } },
+    );
+    const listAfterRemove = (await listAfterRemoveRes.json()) as {
+      voters: Array<{ userId: string }>;
+    };
+    expect(listAfterRemove.voters.some((v) => v.userId === 'u-voter1')).toBe(false);
+    expect(listAfterRemove.voters.some((v) => v.userId === 'u-comment')).toBe(false);
+  });
 });
 

@@ -3,6 +3,8 @@ import {
   FilePlus2,
   Play,
   Plus,
+  RotateCcw,
+  Search,
   Trash2,
   Upload,
   UserCheck,
@@ -32,6 +34,22 @@ interface AdminSetupPageProps {
 }
 
 type SetupSectionId = 'setup-status' | 'setup-voters' | 'setup-bands';
+type PerformerFilter = 'ALL' | 'PERFORMERS_ONLY' | 'NON_PERFORMERS_ONLY';
+type PermissionFilter = 'ALL' | 'UNSET' | PermissionType;
+
+const PERMISSION_LABELS: Record<PermissionType, string> = {
+  SCORE_AND_COMMENT: '採点＋コメント',
+  COMMENT_ONLY: 'コメントのみ',
+};
+
+const PERFORMER_FILTER_OPTIONS: Array<{
+  value: PerformerFilter;
+  label: string;
+}> = [
+  { value: 'ALL', label: 'すべて' },
+  { value: 'PERFORMERS_ONLY', label: '出演者のみ' },
+  { value: 'NON_PERFORMERS_ONLY', label: '非出演者のみ' },
+];
 
 const SAMPLE_BANDS_CSV = `1,Opening Session,六甲 健太 / 三宮 翔
 2,Harbor Blues,灘 花子`;
@@ -73,11 +91,13 @@ export function AdminSetupPage({
   const [currentVoters, setCurrentVoters] = useState<AdminVoterMonitorDto[]>([]);
   const [auditionBands, setAuditionBands] = useState<BandWithMembersDto[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
-  const [performerFilter, setPerformerFilter] = useState<
-    'ALL' | 'PERFORMERS_ONLY' | 'NON_PERFORMERS_ONLY'
-  >('ALL');
-  const [bulkPermType, setBulkPermType] =
-    useState<PermissionType>('SCORE_AND_COMMENT');
+  const [performerFilter, setPerformerFilter] = useState<PerformerFilter>('ALL');
+  const [permissionFilter, setPermissionFilter] = useState<PermissionFilter>('ALL');
+  const [voterSearchQuery, setVoterSearchQuery] = useState('');
+  const [bulkSetting, setBulkSetting] =
+    useState<PermissionType | 'REMOVE'>('COMMENT_ONLY');
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [updatingUserIds, setUpdatingUserIds] = useState<Record<string, boolean>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // オーディション削除確認モーダル
@@ -182,15 +202,67 @@ export function AdminSetupPage({
     return map;
   }, [auditionBands]);
 
-  const bulkMatchedUsers = useMemo(() => {
+  const voterMap = useMemo(
+    () => new Map(currentVoters.map((v) => [v.userId, v])),
+    [currentVoters],
+  );
+
+  const voterSummary = useMemo(() => {
+    let scoreAndComment = 0;
+    let commentOnly = 0;
+    let unset = 0;
+    for (const u of visibleUsers) {
+      const entry = voterMap.get(u.id);
+      if (!entry) {
+        unset++;
+      } else if (entry.permissionType === 'SCORE_AND_COMMENT') {
+        scoreAndComment++;
+      } else {
+        commentOnly++;
+      }
+    }
+    return {
+      total: visibleUsers.length,
+      scoreAndComment,
+      commentOnly,
+      unset,
+    };
+  }, [visibleUsers, voterMap]);
+
+  const filteredUsers = useMemo(() => {
     const targetGrades =
       selectedGrades.length > 0 ? selectedGrades : availableGrades;
+    const normalizedQuery = voterSearchQuery.trim().toLowerCase();
+
     return visibleUsers.filter((u) => {
       const grade = calculateGrade(u.enrollmentYear);
       if (!targetGrades.includes(grade)) return false;
+
       const isPerformer = (performerBandsMap.get(u.id)?.length ?? 0) > 0;
-      if (performerFilter === 'PERFORMERS_ONLY') return isPerformer;
-      if (performerFilter === 'NON_PERFORMERS_ONLY') return !isPerformer;
+      if (performerFilter === 'PERFORMERS_ONLY' && !isPerformer) return false;
+      if (performerFilter === 'NON_PERFORMERS_ONLY' && isPerformer) return false;
+
+      const entry = voterMap.get(u.id);
+      if (permissionFilter === 'UNSET' && entry) return false;
+      if (
+        permissionFilter === 'SCORE_AND_COMMENT' &&
+        entry?.permissionType !== 'SCORE_AND_COMMENT'
+      ) {
+        return false;
+      }
+      if (
+        permissionFilter === 'COMMENT_ONLY' &&
+        entry?.permissionType !== 'COMMENT_ONLY'
+      ) {
+        return false;
+      }
+
+      if (normalizedQuery) {
+        const matchesName = u.name.toLowerCase().includes(normalizedQuery);
+        const matchesEmail = u.email.toLowerCase().includes(normalizedQuery);
+        if (!matchesName && !matchesEmail) return false;
+      }
+
       return true;
     });
   }, [
@@ -199,7 +271,23 @@ export function AdminSetupPage({
     availableGrades,
     performerBandsMap,
     performerFilter,
+    voterMap,
+    permissionFilter,
+    voterSearchQuery,
   ]);
+
+  const hasActiveVoterFilter =
+    selectedGrades.length > 0 ||
+    performerFilter !== 'ALL' ||
+    permissionFilter !== 'ALL' ||
+    voterSearchQuery.trim() !== '';
+
+  const resetVoterFilters = () => {
+    setSelectedGrades([]);
+    setPerformerFilter('ALL');
+    setPermissionFilter('ALL');
+    setVoterSearchQuery('');
+  };
 
   const showToast = (msg: string) => {
     setStatusMessage(msg);
@@ -293,67 +381,84 @@ export function AdminSetupPage({
     showToast(`${res.insertedCount}件のバンドを一括登録しました`);
   };
 
-  const handleBulkVotersByCondition = async (action: 'ASSIGN' | 'REMOVE') => {
-    if (!selectedAudition) return;
-    const targetGrades =
-      selectedGrades.length > 0 ? selectedGrades : availableGrades;
-    const targetEnrollmentYears = Array.from(
-      new Set(
-        visibleUsers
-          .filter((u) =>
-            targetGrades.includes(calculateGrade(u.enrollmentYear)),
-          )
-          .map((u) => u.enrollmentYear),
-      ),
-    );
-    if (targetEnrollmentYears.length === 0) {
-      showToast('対象となる部員（1〜3回生）がいません');
+  const handleBulkVoters = async () => {
+    if (!selectedAudition || bulkProcessing) return;
+    if (filteredUsers.length === 0) {
+      showToast('表示中の対象部員がいません');
       return;
     }
-    const res = await apiJson<{ affectedCount: number }>(
-      `/api/admin/auditions/${selectedAudition.id}/voters/bulk`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          mode: 'BY_CONDITION',
-          enrollmentYears: targetEnrollmentYears,
-          performerFilter,
-          permissionType: bulkPermType,
-          action,
-        }),
-      },
-    );
-    await loadContext();
+
+    const action: 'ASSIGN' | 'REMOVE' =
+      bulkSetting === 'REMOVE' ? 'REMOVE' : 'ASSIGN';
     const permLabel =
-      bulkPermType === 'SCORE_AND_COMMENT' ? '採点＋コメント' : 'コメントのみ';
-    showToast(
-      action === 'ASSIGN'
-        ? `${res.affectedCount}名に採点・コメント義務（${permLabel}）を一括設定しました`
-        : `${res.affectedCount}名の採点・コメント義務を一括解除しました`,
-    );
+      bulkSetting === 'REMOVE' ? '不参加' : PERMISSION_LABELS[bulkSetting];
+
+    if (action === 'REMOVE' || filteredUsers.length >= 2) {
+      const confirmMsg =
+        action === 'ASSIGN'
+          ? `表示中の ${filteredUsers.length}名 を「${permLabel}」に設定しますか？`
+          : `表示中の ${filteredUsers.length}名 を「不参加」（採点・コメントなし）にしますか？`;
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+    }
+
+    setBulkProcessing(true);
+    try {
+      const res = await apiJson<{ affectedCount: number }>(
+        `/api/admin/auditions/${selectedAudition.id}/voters/bulk`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            mode: 'BY_IDS',
+            userIds: filteredUsers.map((u) => u.id),
+            permissionType: action === 'ASSIGN' ? bulkSetting : undefined,
+            action,
+          }),
+        },
+      );
+      await loadContext();
+      showToast(
+        action === 'ASSIGN'
+          ? `${res.affectedCount}名に採点・コメント義務（${permLabel}）を設定しました`
+          : `${res.affectedCount}名を「不参加」（採点・コメントなし）にしました`,
+      );
+    } finally {
+      setBulkProcessing(false);
+    }
   };
 
   const handleSingleVoterAssign = async (
-    userId: string,
-    permissionType: PermissionType | 'REMOVE',
+    user: SelectableUserDto,
+    nextSetting: PermissionType | 'REMOVE',
   ) => {
-    if (!selectedAudition) return;
-    await apiJson(`/api/admin/auditions/${selectedAudition.id}/voters/bulk`, {
-      method: 'POST',
-      body: JSON.stringify({
-        mode: 'BY_IDS',
-        userIds: [userId],
-        permissionType: permissionType === 'REMOVE' ? undefined : permissionType,
-        action: permissionType === 'REMOVE' ? 'REMOVE' : 'ASSIGN',
-      }),
-    });
-    await loadContext();
-  };
+    if (!selectedAudition || updatingUserIds[user.id]) return;
+    const currentSetting = voterMap.get(user.id)?.permissionType ?? 'REMOVE';
+    if (currentSetting === nextSetting) return;
 
-  const voterMap = useMemo(
-    () => new Map(currentVoters.map((v) => [v.userId, v])),
-    [currentVoters],
-  );
+    setUpdatingUserIds((prev) => ({ ...prev, [user.id]: true }));
+    try {
+      await apiJson(`/api/admin/auditions/${selectedAudition.id}/voters/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'BY_IDS',
+          userIds: [user.id],
+          permissionType: nextSetting === 'REMOVE' ? undefined : nextSetting,
+          action: nextSetting === 'REMOVE' ? 'REMOVE' : 'ASSIGN',
+        }),
+      });
+      await loadContext();
+      const label =
+        nextSetting === 'REMOVE' ? '不参加' : PERMISSION_LABELS[nextSetting];
+      showToast(`${user.name} を「${label}」に変更しました`);
+    } finally {
+      setUpdatingUserIds((prev) => {
+        const next = { ...prev };
+        delete next[user.id];
+        return next;
+      });
+    }
+  };
 
   const tocItems: Array<{
     id: SetupSectionId;
@@ -562,19 +667,106 @@ export function AdminSetupPage({
                   </span>
                 </div>
 
+                {/* 設定状況サマリー（クリックで下の表を絞り込み） */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-600 mr-1">
+                    現在の設定状況:
+                  </span>
+                  {(
+                    [
+                      {
+                        value: 'ALL',
+                        label: `すべて (${voterSummary.total}名)`,
+                        activeClass: 'bg-slate-700 text-white border-slate-700',
+                        idleClass:
+                          'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100',
+                      },
+                      {
+                        value: 'SCORE_AND_COMMENT',
+                        label: `採点＋コメント (${voterSummary.scoreAndComment}名)`,
+                        activeClass:
+                          'bg-emerald-700 text-white border-emerald-700',
+                        idleClass:
+                          'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
+                      },
+                      {
+                        value: 'COMMENT_ONLY',
+                        label: `コメントのみ (${voterSummary.commentOnly}名)`,
+                        activeClass: 'bg-amber-600 text-white border-amber-600',
+                        idleClass:
+                          'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100',
+                      },
+                      {
+                        value: 'UNSET',
+                        label: `不参加 (${voterSummary.unset}名)`,
+                        activeClass: 'bg-zinc-700 text-white border-zinc-700',
+                        idleClass:
+                          voterSummary.unset > 0
+                            ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                            : 'bg-zinc-100 text-zinc-600 border-zinc-300 hover:bg-zinc-200',
+                      },
+                    ] as const
+                  ).map((item) => {
+                    const active = permissionFilter === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setPermissionFilter(item.value)}
+                        className={`px-2.5 py-1 rounded-sm text-xs font-bold border transition cursor-pointer ${
+                          active ? item.activeClass : item.idleClass
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 絞り込み条件バー（下の表にリアルタイム反映） */}
                 <div className="bg-zinc-100 border border-zinc-300 rounded-sm p-4 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold text-zinc-700">
+                      絞り込み条件（下の表と一括操作に連動）
+                    </span>
+                    {hasActiveVoterFilter && (
+                      <button
+                        type="button"
+                        onClick={resetVoterFilters}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-900 hover:underline cursor-pointer"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        絞り込みをリセット
+                      </button>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <div className="text-xs font-bold text-zinc-700 mb-1.5">
-                        回生で絞り込み（未選択時は全回生）
+                        回生
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          aria-pressed={selectedGrades.length === 0}
+                          onClick={() => setSelectedGrades([])}
+                          className={`px-2.5 py-1 rounded-sm text-xs font-semibold border transition cursor-pointer ${
+                            selectedGrades.length === 0
+                              ? 'bg-slate-700 text-white border-slate-700'
+                              : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                          }`}
+                        >
+                          全回生
+                        </button>
                         {availableGrades.map((grade) => {
                           const active = selectedGrades.includes(grade);
                           return (
                             <button
                               key={grade}
                               type="button"
+                              aria-pressed={active}
                               onClick={() =>
                                 setSelectedGrades((prev) =>
                                   prev.includes(grade)
@@ -582,10 +774,10 @@ export function AdminSetupPage({
                                     : [...prev, grade],
                                 )
                               }
-                              className={`px-2.5 py-1 rounded-sm text-xs font-semibold border cursor-pointer ${
+                              className={`px-2.5 py-1 rounded-sm text-xs font-semibold border transition cursor-pointer ${
                                 active
                                   ? 'bg-slate-700 text-white border-slate-700'
-                                  : 'bg-zinc-50 text-zinc-700 border-zinc-300'
+                                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
                               }`}
                             >
                               {grade}回生
@@ -602,72 +794,105 @@ export function AdminSetupPage({
 
                     <div>
                       <div className="text-xs font-bold text-zinc-700 mb-1.5">
-                        出演有無フィルタ
+                        出演状況
                       </div>
-                      <select
-                        value={performerFilter}
-                        onChange={(e) =>
-                          setPerformerFilter(
-                            e.target.value as
-                              | 'ALL'
-                              | 'PERFORMERS_ONLY'
-                              | 'NON_PERFORMERS_ONLY',
-                          )
-                        }
-                        className="w-full rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-semibold"
-                      >
-                        <option value="ALL">全部員（出演・非出演すべて）</option>
-                        <option value="PERFORMERS_ONLY">出演バンドメンバーのみ</option>
-                        <option value="NON_PERFORMERS_ONLY">非出演者のみ</option>
-                      </select>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PERFORMER_FILTER_OPTIONS.map((opt) => {
+                          const active = performerFilter === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setPerformerFilter(opt.value)}
+                              className={`px-2.5 py-1 rounded-sm text-xs font-semibold border transition cursor-pointer ${
+                                active
+                                  ? 'bg-slate-700 text-white border-slate-700'
+                                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
-                      <div className="text-xs font-bold text-zinc-700 mb-1.5">
-                        設定する義務区分
-                      </div>
-                      <select
-                        value={bulkPermType}
-                        onChange={(e) =>
-                          setBulkPermType(e.target.value as PermissionType)
-                        }
-                        className="w-full rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-semibold"
+                      <label
+                        htmlFor="voter-search-input"
+                        className="block text-xs font-bold text-zinc-700 mb-1.5"
                       >
-                        <option value="SCORE_AND_COMMENT">
-                          SCORE_AND_COMMENT（採点＋コメント）
-                        </option>
-                        <option value="COMMENT_ONLY">
-                          COMMENT_ONLY（コメントのみ）
-                        </option>
-                      </select>
+                        氏名・メール検索
+                      </label>
+                      <div className="relative">
+                        <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          id="voter-search-input"
+                          type="text"
+                          value={voterSearchQuery}
+                          onChange={(e) => setVoterSearchQuery(e.target.value)}
+                          placeholder="氏名またはメールアドレスで検索"
+                          className="w-full rounded-sm border border-zinc-300 bg-white pl-8 pr-8 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
+                        />
+                        {voterSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setVoterSearchQuery('')}
+                            aria-label="検索をクリア"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-                    <span className="text-xs font-semibold text-zinc-600">
-                      条件に一致する部員: {bulkMatchedUsers.length}名
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleBulkVotersByCondition('REMOVE')}
-                        className="px-3.5 py-2 rounded-sm border border-rose-300 text-rose-700 bg-zinc-50 hover:bg-rose-50 text-xs font-bold cursor-pointer"
+                  {/* 一括操作バー */}
+                  <div className="border-t border-zinc-300 pt-3 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-zinc-700">
+                        表示中の {filteredUsers.length}名
+                        {hasActiveVoterFilter &&
+                          `（全${visibleUsers.length}名中）`}
+                        をまとめて変更:
+                      </span>
+                      <select
+                        aria-label="一括設定する区分"
+                        value={bulkSetting}
+                        onChange={(e) =>
+                          setBulkSetting(
+                            e.target.value as PermissionType | 'REMOVE',
+                          )
+                        }
+                        className="rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800"
                       >
-                        条件に合う部員の義務を解除
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleBulkVotersByCondition('ASSIGN')}
-                        className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
-                      >
-                        条件に合う部員へ一括設定
-                      </button>
+                        <option value="COMMENT_ONLY">コメントのみ</option>
+                        <option value="SCORE_AND_COMMENT">採点＋コメント</option>
+                        <option value="REMOVE">不参加（採点・コメントなし）</option>
+                      </select>
                     </div>
+
+                    <button
+                      type="button"
+                      disabled={filteredUsers.length === 0 || bulkProcessing}
+                      onClick={handleBulkVoters}
+                      className={`px-3.5 py-1.5 rounded-sm text-white text-xs font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                        bulkSetting === 'REMOVE'
+                          ? 'bg-rose-600 hover:bg-rose-700'
+                          : 'bg-slate-700 hover:bg-slate-800'
+                      }`}
+                    >
+                      {bulkProcessing
+                        ? '反映中...'
+                        : `表示中の ${filteredUsers.length}名 に適用`}
+                    </button>
                   </div>
                 </div>
 
                 {/* 個別確認・変更テーブル */}
-                <div className="overflow-x-auto border border-zinc-300 rounded-sm">
+                <div className="overflow-x-auto border border-zinc-300 rounded-sm bg-white">
                   <table className="w-full text-left border-collapse text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
@@ -679,13 +904,16 @@ export function AdminSetupPage({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {visibleUsers.map((u) => {
+                      {filteredUsers.map((u) => {
                         const entry = voterMap.get(u.id);
+                        const currentSetting: PermissionType | 'REMOVE' =
+                          entry ? entry.permissionType : 'REMOVE';
+                        const isUpdating = Boolean(updatingUserIds[u.id]);
                         const grade = calculateGrade(u.enrollmentYear);
                         const performingBands = performerBandsMap.get(u.id) ?? [];
                         const isPerformer = performingBands.length > 0;
                         return (
-                          <tr key={u.id}>
+                          <tr key={u.id} className="hover:bg-zinc-50/70">
                             <td className="px-3 py-2.5 font-medium text-zinc-800">
                               {u.name}
                               <div className="text-[11px] text-zinc-400 font-mono">
@@ -717,68 +945,103 @@ export function AdminSetupPage({
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 whitespace-nowrap">
                               {entry ? (
                                 <span
-                                  className={`px-2 py-0.5 rounded-sm text-xs font-semibold ${
+                                  className={`inline-block px-2 py-0.5 rounded-sm text-xs font-semibold border ${
                                     entry.permissionType === 'SCORE_AND_COMMENT'
-                                      ? 'bg-emerald-50 text-emerald-800'
-                                      : 'bg-amber-50 text-amber-800'
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
                                   }`}
                                 >
-                                  {entry.permissionType === 'SCORE_AND_COMMENT'
-                                    ? '採点＋コメント'
-                                    : 'コメントのみ'}
+                                  {PERMISSION_LABELS[entry.permissionType]}
                                 </span>
                               ) : (
-                                <span className="text-xs text-zinc-400">
-                                  未設定（対象外）
+                                <span className="inline-block px-2 py-0.5 rounded-sm text-xs font-semibold bg-zinc-100 text-zinc-500 border border-zinc-200">
+                                  不参加
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 text-right">
-                              <div className="inline-flex gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleSingleVoterAssign(u.id, 'SCORE_AND_COMMENT')
-                                  }
-                                  className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold cursor-pointer"
-                                >
-                                  採点+コメ
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleSingleVoterAssign(u.id, 'COMMENT_ONLY')
-                                  }
-                                  className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold cursor-pointer"
-                                >
-                                  コメのみ
-                                </button>
-                                {entry && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleSingleVoterAssign(u.id, 'REMOVE')
-                                    }
-                                    className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold cursor-pointer"
-                                  >
-                                    解除
-                                  </button>
-                                )}
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                              <div
+                                role="group"
+                                aria-label={`${u.name}の採点・コメント義務設定`}
+                                className="inline-flex rounded-sm border border-zinc-300 overflow-hidden divide-x divide-zinc-300"
+                              >
+                                {(
+                                  [
+                                    {
+                                      value: 'SCORE_AND_COMMENT',
+                                      label: '採点＋コメント',
+                                      activeClass:
+                                        'bg-emerald-700 text-white font-bold',
+                                      idleClass:
+                                        'bg-white text-zinc-700 hover:bg-emerald-50 hover:text-emerald-800',
+                                    },
+                                    {
+                                      value: 'COMMENT_ONLY',
+                                      label: 'コメントのみ',
+                                      activeClass:
+                                        'bg-amber-600 text-white font-bold',
+                                      idleClass:
+                                        'bg-white text-zinc-700 hover:bg-amber-50 hover:text-amber-800',
+                                    },
+                                    {
+                                      value: 'REMOVE',
+                                      label: '不参加',
+                                      activeClass:
+                                        'bg-zinc-600 text-white font-bold',
+                                      idleClass:
+                                        'bg-white text-zinc-600 hover:bg-rose-50 hover:text-rose-700',
+                                    },
+                                  ] as const
+                                ).map((opt) => {
+                                  const isActive = currentSetting === opt.value;
+                                  return (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      aria-pressed={isActive}
+                                      disabled={isActive || isUpdating || bulkProcessing}
+                                      onClick={() =>
+                                        handleSingleVoterAssign(u, opt.value)
+                                      }
+                                      className={`px-2.5 py-1 text-[11px] font-semibold transition ${
+                                        isActive
+                                          ? `${opt.activeClass} cursor-default`
+                                          : `${opt.idleClass} cursor-pointer`
+                                      } disabled:opacity-75`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </td>
                           </tr>
                         );
                       })}
-                      {visibleUsers.length === 0 && (
+                      {filteredUsers.length === 0 && (
                         <tr>
                           <td
                             colSpan={5}
-                            className="px-3 py-6 text-center text-xs text-zinc-500"
+                            className="px-3 py-8 text-center text-xs text-zinc-500 space-y-2"
                           >
-                            表示対象の部員（1〜3回生）がいません
+                            <div>
+                              {visibleUsers.length === 0
+                                ? '表示対象の部員（1〜3回生）がいません'
+                                : '条件に一致する部員がいません'}
+                            </div>
+                            {visibleUsers.length > 0 && hasActiveVoterFilter && (
+                              <button
+                                type="button"
+                                onClick={resetVoterFilters}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-zinc-300 bg-zinc-50 hover:bg-zinc-100 text-xs font-bold text-slate-700 cursor-pointer"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                絞り込みをリセット
+                              </button>
+                            )}
                           </td>
                         </tr>
                       )}
