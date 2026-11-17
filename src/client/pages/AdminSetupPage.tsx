@@ -111,6 +111,8 @@ export function AdminSetupPage({
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [updatingUserIds, setUpdatingUserIds] = useState<Record<string, boolean>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [standardDiffDraft, setStandardDiffDraft] = useState('100');
+  const [savingStandardDiff, setSavingStandardDiff] = useState(false);
 
   // オーディション削除確認モーダル
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -140,6 +142,34 @@ export function AdminSetupPage({
       setCurrentVoters([]);
       setAuditionBands([]);
       setOrderedBandIds([]);
+    }
+  };
+
+  useEffect(() => {
+    setStandardDiffDraft(String(selectedAudition?.standardDiff ?? 100));
+  }, [selectedAudition?.id, selectedAudition?.standardDiff]);
+
+  const handleUpdateStandardDiff = async () => {
+    if (!selectedAudition) return;
+    const num = Number(standardDiffDraft);
+    if (!Number.isFinite(num) || num <= 0 || num > 100) {
+      setStatusMessage('点差補正定数は 1〜100 の数値で入力してください。');
+      return;
+    }
+    setSavingStandardDiff(true);
+    try {
+      await apiJson(`/api/admin/auditions/${selectedAudition.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ standardDiff: num }),
+      });
+      await onAuditionsChanged();
+      setStatusMessage(`点差補正定数を ${num} に更新しました。`);
+    } catch (err) {
+      setStatusMessage(
+        err instanceof Error ? err.message : '定数の更新に失敗しました',
+      );
+    } finally {
+      setSavingStandardDiff(false);
     }
   };
 
@@ -1350,6 +1380,37 @@ export function AdminSetupPage({
                     </ul>
                   </div>
                 )}
+              </section>
+
+              {/* 詳細設定: 点差補正定数 */}
+              <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-sm font-bold text-zinc-800">
+                    詳細設定：点差補正定数（既定値 100）
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    Min-Max 点差補正の換算満点（通常は 100 点満点換算の 100 固定を推奨）。過去Excel（10点満点）と比較する場合のみ 10 等に変更してください。
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={standardDiffDraft}
+                    onChange={(e) => setStandardDiffDraft(e.target.value)}
+                    className="w-20 rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-bold text-right"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingStandardDiff}
+                    onClick={handleUpdateStandardDiff}
+                    className="px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    {savingStandardDiff ? '保存中...' : '定数変更'}
+                  </button>
+                </div>
               </section>
 
               {/* 危険な操作: オーディション削除 */}

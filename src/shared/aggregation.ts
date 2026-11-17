@@ -4,7 +4,7 @@ export interface AggregationAuditionInput {
   id: string;
   isPenaltyEnabled: boolean;
   aggregationMethod: AggregationMethod;
-  standardDiff: number; // デフォルト 10
+  standardDiff: number; // デフォルト 100
 }
 
 export interface AggregationBandInput {
@@ -159,7 +159,7 @@ export function calculateAuditionResults(
   voters: AggregationVoterInput[],
   scores: AggregationScoreInput[],
 ): AuditionAggregationOutput {
-  const standardDiff = audition.standardDiff > 0 ? audition.standardDiff : 10;
+  const standardDiff = audition.standardDiff > 0 ? audition.standardDiff : 100;
 
   const bandMap = new Map<string, AggregationBandInput>();
   for (const band of bands) {

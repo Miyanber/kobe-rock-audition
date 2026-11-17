@@ -43,7 +43,7 @@ export const auditions = sqliteTable(
     })
       .notNull()
       .default('DIFF_CORRECTION'),
-    standardDiff: real('standard_diff').notNull().default(10.0),
+    standardDiff: real('standard_diff').notNull().default(100.0),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
