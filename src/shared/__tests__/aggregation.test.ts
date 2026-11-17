@@ -112,21 +112,21 @@ describe('calculateAuditionResults', () => {
     const u3Stats = result.evaluatorStats.find((e) => e.userId === 'u3')!;
     expect(u3Stats.validVoteCount).toBe(0);
 
-    // b1 の確認: u1(自バンド除外), u3(COMMENT_ONLY除外) -> u2(60 * 0.5 = 30) のみ有効
+    // b1 の確認: u1(自バンド除外), u3(COMMENT_ONLY除外) -> u2((60 - 60) * 0.5 = 0) のみ有効
     const b1 = result.bandResults.find((b) => b.bandId === 'b1')!;
     expect(b1.validVoteCount).toBe(1);
     expect(b1.commentCount).toBe(2); // u2 と u3 のコメント（u1は自バンドのため除外）
-    expect(b1.activeFinalScore).toBeCloseTo(30, 6);
-    expect(b1.activeAvgNormTech).toBeCloseTo(15, 6);
-    expect(b1.activeAvgNormCharm).toBeCloseTo(15, 6);
+    expect(b1.activeFinalScore).toBeCloseTo(0, 6);
+    expect(b1.activeAvgNormTech).toBeCloseTo(0, 6);
+    expect(b1.activeAvgNormCharm).toBeCloseTo(0, 6);
 
-    // b3 の正規化按分確認: u2 の 70(42+28) * 0.5 = 35 -> tech 21, charm 14
+    // b3 の正規化按分確認: u2 の (70(42+28) - 60) * 0.5 = 5 -> tech 3, charm 2
     const u2b3 = result.voteRecords.find(
       (r) => r.bandId === 'b3' && r.evaluatorUserId === 'u2',
     )!;
-    expect(u2b3.diffCorrected?.normTotal).toBeCloseTo(35, 6);
-    expect(u2b3.diffCorrected?.normTech).toBeCloseTo(21, 6);
-    expect(u2b3.diffCorrected?.normCharm).toBeCloseTo(14, 6);
+    expect(u2b3.diffCorrected?.normTotal).toBeCloseTo(5, 6);
+    expect(u2b3.diffCorrected?.normTech).toBeCloseTo(3, 6);
+    expect(u2b3.diffCorrected?.normCharm).toBeCloseTo(2, 6);
   });
 
   it('全バンド同点（Diff = 0, stdDev = 0）でもゼロ除算せずフォールバックする', () => {
@@ -163,11 +163,11 @@ describe('calculateAuditionResults', () => {
     // b1(pen=0), b2(pen=0), b3(pen=10)
     // u2: b1=70(tech35,charm35), b2=70(tech40,charm30), b3=80(tech40,charm40)
     // diff = 80 - 70 = 10 -> factor = 10 / 10 = 1.0
-    // isPenaltyEnabled = true の場合:
-    // b3: pre=80, penalty=10 -> final=70
-    // b2: pre=70, penalty=0 -> final=70 (技術平均40)
-    // b1: pre=70, penalty=0 -> final=70 (技術平均35)
-    // タイブレーク順: final同点(70) -> prePenaltyScore(b3が80で1位！) -> 素点技術平均(b2が40で2位、b1が35で3位)
+    // isPenaltyEnabled = true の場合 (Min-Max点差補正: min=70, diff=10, factor=1.0):
+    // b3: pre=10, penalty=10 -> final=0
+    // b2: pre=0, penalty=0 -> final=0 (技術平均40)
+    // b1: pre=0, penalty=0 -> final=0 (技術平均35)
+    // タイブレーク順: final同点(0) -> prePenaltyScore(b3が10で1位！) -> 素点技術平均(b2が40で2位、b1が35で3位)
     const bands: AggregationBandInput[] = [
       { id: 'b1', name: 'B1', performanceOrder: 1, penaltyDeduction: 0, memberUserIds: [] },
       { id: 'b2', name: 'B2', performanceOrder: 2, penaltyDeduction: 0, memberUserIds: [] },
@@ -189,8 +189,8 @@ describe('calculateAuditionResults', () => {
       scores,
     );
     expect(withPenalty.bandResults.map((b) => b.bandId)).toEqual(['b3', 'b2', 'b1']);
-    expect(withPenalty.bandResults[0].activePrePenaltyScore).toBe(80);
-    expect(withPenalty.bandResults[0].activeFinalScore).toBe(70);
+    expect(withPenalty.bandResults[0].activePrePenaltyScore).toBe(10);
+    expect(withPenalty.bandResults[0].activeFinalScore).toBe(0);
 
     // ペナルティOFF時は prePenaltyScore は変わらず finalScore だけ戻る
     const withoutPenalty = calculateAuditionResults(
@@ -199,8 +199,8 @@ describe('calculateAuditionResults', () => {
       voters,
       scores,
     );
-    expect(withoutPenalty.bandResults[0].activeFinalScore).toBe(80);
-    expect(withoutPenalty.bandResults[0].activePrePenaltyScore).toBe(80);
+    expect(withoutPenalty.bandResults[0].activeFinalScore).toBe(10);
+    expect(withoutPenalty.bandResults[0].activePrePenaltyScore).toBe(10);
   });
 });
 

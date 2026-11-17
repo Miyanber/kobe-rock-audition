@@ -30,7 +30,7 @@ const WINTER_BANDS: Array<{ name: string; penalty: number; techBias: number }> =
   { name: 'Bruno Mars', penalty: 0, techBias: 0.53 },
   { name: 'バズマザーズ', penalty: 0, techBias: 0.52 },
   { name: 'Bialy', penalty: 0, techBias: 0.50 },
-  { name: 'Age', penalty: 1.5, techBias: 0.49 },
+  { name: 'Age', penalty: 0, techBias: 0.49 },
   { name: 'Mr. Children', penalty: 0, techBias: 0.47 },
   { name: '板歯目', penalty: 0, techBias: 0.51 },
   { name: 'Aooo', penalty: 0, techBias: 0.50 },
@@ -45,7 +45,7 @@ const WINTER_BANDS: Array<{ name: string; penalty: number; techBias: number }> =
   { name: '奥田民生', penalty: 0, techBias: 0.48 },
   { name: 'tricot', penalty: 0, techBias: 0.56 },
   { name: 'RAD', penalty: 0, techBias: 0.48 },
-  { name: "Laget's Jam Stack", penalty: 1.0, techBias: 0.55 },
+  { name: "Laget's Jam Stack", penalty: 0, techBias: 0.55 },
   { name: '34', penalty: 0, techBias: 0.53 },
   { name: '超☆社会的サンダル', penalty: 0, techBias: 0.45 },
   { name: 'MASS', penalty: 0, techBias: 0.51 },
@@ -54,7 +54,7 @@ const WINTER_BANDS: Array<{ name: string; penalty: number; techBias: number }> =
   { name: 'Lucky Kilimanjaro', penalty: 0, techBias: 0.48 },
   { name: 'the band apart', penalty: 0, techBias: 0.56 },
   { name: 'Green Day', penalty: 0, techBias: 0.47 },
-  { name: 'Bye-Bye', penalty: 2.0, techBias: 0.49 },
+  { name: 'Bye-Bye', penalty: 0, techBias: 0.49 },
   { name: 'cinema staff', penalty: 0, techBias: 0.54 },
   { name: '羊文学', penalty: 0, techBias: 0.48 },
 ];
@@ -400,7 +400,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'aud-2026-winter',
-      title: '2026 冬ライブオーディション',
+      title: '六甲祭2026',
       eventDate: '2026-12-20',
       deadline: '2026-12-15T23:59',
       status: 'ACTIVE',
@@ -471,17 +471,65 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   addMember('b-win-3', 'u-multi', 'Gt');
   addMember('b-win-4', 'u-admin', 'Vo');
 
-  // Fill remaining slots (3-5 members per band) across the 32 winter bands
-  const memberPool = userList.filter((u) => u.id !== 'u-unregistered' && u.id !== 'u-comment');
+  // Map the 69 Excel rows to submitted SCORE_AND_COMMENT voters:
+  // row 20 (null at band4) -> u-admin, row 10 (null at band2) -> u-voter1, remaining 67 rows -> extraMembers[0..66]
+  const extraMembers = userList.slice(6); // 119 users
+  const remainingMatrixIndices = Array.from({ length: EXCEL_SCORE_MATRIX.length }, (_, i) => i).filter(
+    (i) => i !== 10 && i !== 20,
+  );
+  const winterScoreVoters: Array<{ userId: string; submitted: boolean; matrixIdx: number }> = [
+    { userId: 'u-admin', submitted: true, matrixIdx: 20 },
+    { userId: 'u-voter1', submitted: true, matrixIdx: 10 },
+    { userId: 'u-multi', submitted: false, matrixIdx: -1 },
+    { userId: 'u-voter2', submitted: false, matrixIdx: -1 },
+    ...remainingMatrixIndices.map((mIdx, i) => ({
+      userId: extraMembers[i].id,
+      submitted: true,
+      matrixIdx: mIdx,
+    })),
+    // Unsubmitted SCORE_AND_COMMENT voters (extraMembers[67..82])
+    ...extraMembers.slice(67, 83).map((u) => ({
+      userId: u.id,
+      submitted: false,
+      matrixIdx: -1,
+    })),
+  ];
+
+  // Build a lookup of which Excel voter has null for which band so bandMembers never skip a non-null Excel cell
+  const excelVoterNullBands = new Map<string, Set<number>>();
+  for (const v of winterScoreVoters) {
+    if (v.matrixIdx >= 0) {
+      const nulls = new Set<number>();
+      EXCEL_SCORE_MATRIX[v.matrixIdx].forEach((val, bIdx) => {
+        if (val === null) nulls.add(bIdx);
+      });
+      excelVoterNullBands.set(v.userId, nulls);
+    }
+  }
+
+  // Fill remaining slots (3-5 members per band) across the 32 winter bands without colliding with non-null Excel cells
+  const unsubmittedScorePool = extraMembers.slice(67, 95);
   WINTER_BANDS.forEach((_, idx) => {
     const bandId = `b-win-${idx + 1}`;
     const targetCount = 3 + (idx % 3); // 3, 4, or 5
     const bandInsts = ['Vo', 'Gt', 'Ba', 'Dr', idx % 2 === 0 ? 'Key' : 'Gt/Cho'];
-    let instIdx = (bandMemberSet.get(bandId)?.size ?? 0);
+    let instIdx = bandMemberSet.get(bandId)?.size ?? 0;
+
+    // First assign submitted Excel voters whose Excel cell for this band is already null
+    for (const v of winterScoreVoters) {
+      if ((bandMemberSet.get(bandId)?.size ?? 0) >= targetCount) break;
+      if (v.matrixIdx >= 0 && excelVoterNullBands.get(v.userId)?.has(idx)) {
+        if (addMember(bandId, v.userId, bandInsts[instIdx % bandInsts.length])) {
+          instIdx++;
+        }
+      }
+    }
+
+    // Fill remaining member slots from non-Excel-matrix members
     let guard = 0;
-    while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 200) {
+    while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 100) {
       guard++;
-      const pick = memberPool[(idx * 5 + guard * 17 + Math.floor(rand() * 7)) % memberPool.length];
+      const pick = unsubmittedScorePool[(idx * 5 + guard * 7) % unsubmittedScorePool.length];
       const inst = bandInsts[instIdx % bandInsts.length] ?? INSTRUMENTS[instIdx % INSTRUMENTS.length];
       if (addMember(bandId, pick.id, inst)) {
         instIdx++;
@@ -538,6 +586,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   });
 
+  const memberPool = userList.filter((u) => u.id !== 'u-unregistered' && u.id !== 'u-comment');
   addMember('b-spr-1', 'u-voter1', 'Ba');
   SPRING_DRAFT_BANDS.forEach((_, idx) => {
     const bandId = `b-spr-${idx + 1}`;
@@ -560,30 +609,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   let avSeq = 1;
   let scSeq = 1;
 
-  // --- 4a. Winter Audition (ACTIVE) ---
-  // Core demo voters:
-  // u-admin (submitted), u-multi (unsubmitted), u-voter1 (submitted), u-voter2 (unsubmitted), u-comment (COMMENT_ONLY, submitted)
-  // Plus 95 more SCORE_AND_COMMENT voters (81 submitted, 14 unsubmitted)
-  // Plus 17 more COMMENT_ONLY voters (13 submitted, 4 unsubmitted)
-  // Unregistered: u-unregistered + last 6 users (u-m114..u-m119)
-  const extraMembers = userList.slice(6); // 119 users
-  const winterScoreVoters: Array<{ userId: string; submitted: boolean; matrixIdx: number }> = [
-    { userId: 'u-admin', submitted: true, matrixIdx: 0 },
-    { userId: 'u-voter1', submitted: true, matrixIdx: 1 },
-    { userId: 'u-multi', submitted: false, matrixIdx: -1 },
-    { userId: 'u-voter2', submitted: false, matrixIdx: -1 },
-  ];
-
-  // 95 additional SCORE_AND_COMMENT voters from extraMembers[0..94]
-  for (let i = 0; i < 95; i++) {
-    const submitted = i < 81; // 81 submitted, 14 unsubmitted
-    winterScoreVoters.push({
-      userId: extraMembers[i].id,
-      submitted,
-      matrixIdx: submitted ? i + 2 : -1,
-    });
-  }
-
+  // --- 4a. 六甲祭2026 (ACTIVE, exact 69x32 Excel matrix) ---
   const winterCommentVoters: Array<{ userId: string; submitted: boolean }> = [
     { userId: 'u-comment', submitted: true },
   ];
@@ -616,77 +642,28 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   }
 
-  // Precompute per-band mean from EXCEL_SCORE_MATRIX for synthesizing voters beyond row 69
-  const winterBandMeans = WINTER_BANDS.map((_, colIdx) => {
-    let sum = 0;
-    let cnt = 0;
-    for (const row of EXCEL_SCORE_MATRIX) {
-      const val = row[colIdx];
-      if (val !== null) {
-        sum += val;
-        cnt++;
-      }
-    }
-    return cnt > 0 ? sum / cnt : 70;
-  });
-
-  // Insert scores for submitted SCORE_AND_COMMENT winter voters
+  // Insert exact Excel scores for the 69 submitted SCORE_AND_COMMENT voters
   for (const v of winterScoreVoters) {
-    if (v.submitted) {
-      const useMatrix = v.matrixIdx >= 0 && v.matrixIdx < EXCEL_SCORE_MATRIX.length;
-      const voterBias = (rand() - 0.5) * 14;
-      const voterScale = 0.8 + rand() * 0.45;
+    if (!v.submitted || v.matrixIdx < 0) continue;
+    for (let bIdx = 0; bIdx < WINTER_BANDS.length; bIdx++) {
+      const bandId = `b-win-${bIdx + 1}`;
+      if (bandMemberSet.get(bandId)?.has(v.userId)) continue;
 
-      for (let bIdx = 0; bIdx < WINTER_BANDS.length; bIdx++) {
-        const bandId = `b-win-${bIdx + 1}`;
-        // Self-band exclusion
-        if (bandMemberSet.get(bandId)?.has(v.userId)) continue;
+      const total = EXCEL_SCORE_MATRIX[v.matrixIdx][bIdx];
+      if (total === null) continue;
 
-        let total: number | null = null;
-        if (useMatrix) {
-          total = EXCEL_SCORE_MATRIX[v.matrixIdx][bIdx];
-        } else {
-          // Synthesize realistic score based on Excel band mean + voter tendency
-          if (rand() > 0.04) {
-            const raw = 70 + (winterBandMeans[bIdx] - 70) * voterScale + voterBias + (rand() - 0.5) * 10;
-            total = clamp(Math.round(raw), 30, 99);
-          }
-        }
-        if (total === null) continue;
-
-        const { techScore, charmScore } = splitTotalScore(total, WINTER_BANDS[bIdx].techBias, rand);
-        scoreList.push({
-          id: `sc-${scSeq++}`,
-          auditionId: 'aud-2026-winter',
-          bandId,
-          evaluatorUserId: v.userId,
-          techScore,
-          charmScore,
-          comment: pickComment(total, rand),
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    } else if (v.userId !== 'u-multi' && v.userId !== 'u-voter2' && rand() < 0.35) {
-      // A few unsubmitted voters have partial draft scores saved
-      const draftBands = 4 + Math.floor(rand() * 6);
-      for (let bIdx = 0; bIdx < draftBands; bIdx++) {
-        const bandId = `b-win-${bIdx + 1}`;
-        if (bandMemberSet.get(bandId)?.has(v.userId)) continue;
-        const total = clamp(Math.round(winterBandMeans[bIdx] + (rand() - 0.5) * 12), 40, 95);
-        const { techScore, charmScore } = splitTotalScore(total, WINTER_BANDS[bIdx].techBias, rand);
-        scoreList.push({
-          id: `sc-${scSeq++}`,
-          auditionId: 'aud-2026-winter',
-          bandId,
-          evaluatorUserId: v.userId,
-          techScore,
-          charmScore,
-          comment: pickComment(total, rand),
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
+      const { techScore, charmScore } = splitTotalScore(total, WINTER_BANDS[bIdx].techBias, rand);
+      scoreList.push({
+        id: `sc-${scSeq++}`,
+        auditionId: 'aud-2026-winter',
+        bandId,
+        evaluatorUserId: v.userId,
+        techScore,
+        charmScore,
+        comment: pickComment(total, rand),
+        createdAt: now,
+        updatedAt: now,
+      });
     }
   }
 

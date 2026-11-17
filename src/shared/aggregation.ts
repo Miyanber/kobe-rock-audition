@@ -312,8 +312,9 @@ export function calculateAuditionResults(
       const rawCharm = Number(pv.score.charmScore);
       const rawTotal = pv.rawTotal;
 
-      // 点差補正方式: rawTotal * (standardDiff / Diff)
-      const diffNormTotal = rawTotal * stats.correctionFactor;
+      // 点差補正方式 (Min-Max正規化): (rawTotal - minScore) * (standardDiff / Diff)
+      const minScore = stats.minScore ?? rawTotal;
+      const diffNormTotal = (rawTotal - minScore) * stats.correctionFactor;
       diffCorrected = splitNormalizedScores(diffNormTotal, rawTech, rawCharm);
 
       // Zスコア方式: 50 + 10 * ((rawTotal - mean) / stdDev)
