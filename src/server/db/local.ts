@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema.ts';
 import type { AppDb } from './client.ts';
-import { ensureSeedData } from './seed.ts';
+import { ensureRealisticSeedData } from './seed.ts';
 
 let cachedDb: AppDb | null = null;
 let initializedPromise: Promise<AppDb> | null = null;
@@ -94,7 +94,7 @@ export async function getLocalDb(dbPath: string = '.local-dev.sqlite'): Promise<
       const sqlite = new Database(dbPath);
       createTablesIfNotExists(sqlite);
       const db = drizzle(sqlite, { schema }) as unknown as AppDb;
-      await ensureSeedData(db);
+      await ensureRealisticSeedData(db);
       cachedDb = db;
       return db;
     })();
