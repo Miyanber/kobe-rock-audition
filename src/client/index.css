@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @layer base {
   input[type="range"] {
@@ -17,5 +17,28 @@
     outline: none;
     border-color: #334155;
     box-shadow: none;
+  }
+}
+
+@layer base {
+  /* iOS Safari はフォントサイズ16px未満の入力欄でフォーカス時に自動ズームするため、スマホでは16pxに固定 */
+  @media (max-width: 639px) {
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer base {
+  /* 一覧テーブルのセルは縦書き状に折り返さず、横スクロールで見せる */
+  table th,
+  table td {
+    white-space: nowrap;
+  }
+  /* 長い選択肢で select がはみ出さないようにする */
+  select {
+    max-width: 100%;
   }
 }

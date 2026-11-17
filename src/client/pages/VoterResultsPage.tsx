@@ -165,7 +165,7 @@ export function VoterResultsPage() {
             value={selectedAuditionId}
             onChange={(e) => setSelectedAuditionId(e.target.value)}
             aria-label="閲覧するオーディションを選択"
-            className="rounded-sm border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 focus:border-slate-600 focus:outline-none"
+            className="w-full sm:w-auto min-w-0 rounded-sm border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 focus:border-slate-600 focus:outline-none"
           >
             {closedAuditions.map((a) => (
               <option key={a.id} value={a.id}>

@@ -28,8 +28,8 @@ export function Layout({
     <div className="min-h-screen flex flex-col bg-zinc-100">
       <header className="sticky top-0 z-30 bg-slate-700 text-white">
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
-          <div className="flex items-center justify-between h-14 gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center justify-between h-14 gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0">
               <div className="h-8 w-8 rounded-sm bg-slate-600 flex items-center justify-center shrink-0">
                 <Award className="h-5 w-5 text-white" />
               </div>
@@ -40,21 +40,28 @@ export function Layout({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <div className="hidden sm:flex items-center gap-2 text-xs bg-slate-700 px-3 py-1.5 rounded-sm border border-slate-700">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-xs bg-slate-600/50 sm:bg-slate-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-sm border border-slate-600 sm:border-slate-700 min-w-0">
                 {isAdmin && (
-                  <span className="inline-flex items-center gap-1 text-amber-300 font-semibold">
+                  <span
+                    className="inline-flex items-center gap-1 text-amber-300 font-semibold shrink-0"
+                    title="ADMIN"
+                  >
                     <Shield className="h-3.5 w-3.5" />
-                    ADMIN
+                    <span className="hidden sm:inline">ADMIN</span>
                   </span>
                 )}
-                <span className="font-medium text-slate-100">{user.name}</span>
-                <span className="text-zinc-400">({user.grade}回生)</span>
+                <span className="font-medium text-slate-100 truncate">
+                  {user.name}
+                </span>
+                <span className="hidden sm:inline text-zinc-400 shrink-0">
+                  ({user.grade}回生)
+                </span>
               </div>
               <button
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 sm:border-slate-700 transition cursor-pointer shrink-0"
                 title="ログアウト"
               >
                 <LogOut className="h-3.5 w-3.5" />

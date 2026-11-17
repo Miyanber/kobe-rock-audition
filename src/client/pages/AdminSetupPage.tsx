@@ -420,11 +420,19 @@ export function AdminSetupPage({
     });
   };
 
-  const handleBandDrop = (targetBandId: string) => {
-    if (!draggingBandId || draggingBandId === targetBandId) {
-      setDraggingBandId(null);
-      return;
-    }
+  // Pointer Events ベースのドラッグ（マウス・タッチ両対応）。
+  // ハンドル上でポインタを動かすと、下にある行の位置へリアルタイムに入れ替える。
+  const handleGripPointerDown = (e: React.PointerEvent<HTMLElement>, bandId: string) => {
+    if (savingOrder) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDraggingBandId(bandId);
+  };
+
+  const handleGripPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (!draggingBandId) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const targetBandId = el?.closest<HTMLElement>('[data-band-id]')?.dataset.bandId;
+    if (!targetBandId || targetBandId === draggingBandId) return;
     setOrderedBandIds((prev) => {
       const fromIndex = prev.indexOf(draggingBandId);
       const toIndex = prev.indexOf(targetBandId);
@@ -434,8 +442,9 @@ export function AdminSetupPage({
       next.splice(toIndex, 0, moved);
       return next;
     });
-    setDraggingBandId(null);
   };
+
+  const handleGripPointerEnd = () => setDraggingBandId(null);
 
   const resetBandOrder = () => {
     setOrderedBandIds(auditionBands.map((b) => b.id));
@@ -1205,14 +1214,7 @@ export function AdminSetupPage({
                       return (
                         <div
                           key={band.id}
-                          draggable={!savingOrder}
-                          onDragStart={() => setDraggingBandId(band.id)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            handleBandDrop(band.id);
-                          }}
-                          onDragEnd={() => setDraggingBandId(null)}
+                          data-band-id={band.id}
                           className={`flex items-center justify-between gap-3 px-3.5 py-2.5 transition ${
                             isDragging
                               ? 'bg-slate-100 opacity-60'
@@ -1222,7 +1224,12 @@ export function AdminSetupPage({
                           <div className="flex items-center gap-3 min-w-0">
                             <span
                               title="ドラッグして並び替え"
-                              className="hidden sm:inline-flex text-zinc-400 cursor-grab active:cursor-grabbing shrink-0"
+                              onPointerDown={(e) => handleGripPointerDown(e, band.id)}
+                              onPointerMove={handleGripPointerMove}
+                              onPointerUp={handleGripPointerEnd}
+                              onPointerCancel={handleGripPointerEnd}
+                              style={{ touchAction: 'none' }}
+                              className="inline-flex items-center self-stretch px-1 -ml-1 text-zinc-400 cursor-grab active:cursor-grabbing shrink-0 select-none"
                             >
                               <GripVertical className="h-4 w-4" />
                             </span>
@@ -1380,7 +1387,7 @@ export function AdminSetupPage({
           aria-modal="true"
           aria-labelledby="create-audition-modal-title"
         >
-          <div className="w-full max-w-md rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
+          <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
             <div className="flex items-start justify-between gap-2">
               <div className="space-y-1">
                 <h3
@@ -1466,7 +1473,7 @@ export function AdminSetupPage({
           aria-modal="true"
           aria-labelledby="delete-audition-modal-title"
         >
-          <div className="w-full max-w-md rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
+          <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
             <div className="space-y-1.5">
               <h3
                 id="delete-audition-modal-title"

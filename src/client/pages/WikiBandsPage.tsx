@@ -237,7 +237,7 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
             <select
               value={selectedAuditionId}
               onChange={(e) => setSelectedAuditionId(e.target.value)}
-              className="rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800"
+              className="w-full sm:w-auto min-w-0 rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800"
             >
               {auditionOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -394,7 +394,7 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
       {/* バンド登録・編集モーダル */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-700/60 flex items-center justify-center p-4">
-          <div className="bg-zinc-50 rounded-sm max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-zinc-50 rounded-sm max-w-xl w-full max-h-[90dvh] flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between">
               <h2 className="text-base sm:text-lg font-bold text-zinc-800">
                 {editingBandId ? 'バンド情報の編集' : '新規バンド登録'}

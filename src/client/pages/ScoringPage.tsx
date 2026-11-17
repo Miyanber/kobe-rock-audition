@@ -302,7 +302,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   }
 
   return (
-    <div className="space-y-3 pb-20">
+    <div className="space-y-3 pb-28">
       {/* 開催回情報 & 提出ステータスヘッダー */}
       <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-3 sm:p-4 space-y-2.5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -690,7 +690,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       </div>
 
       {/* 下部固定アクションバー */}
-      <div className="fixed bottom-0 inset-x-0 z-20 bg-zinc-50 border-t border-zinc-300 px-3 sm:px-6 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-20 bg-zinc-50 border-t border-zinc-300 px-3 sm:px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
           <div className="text-xs sm:text-sm text-zinc-700 font-medium">
             完了:{' '}
@@ -736,7 +736,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
       {/* マイ採点・順位確認モーダル */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 bg-slate-700/60 flex items-center justify-center p-4">
-          <div className="bg-zinc-50 rounded-sm max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+          <div className="bg-zinc-50 rounded-sm max-w-2xl w-full max-h-[85dvh] flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-zinc-800">
