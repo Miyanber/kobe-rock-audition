@@ -52,14 +52,14 @@ export function useScoreDrafts(
     const merged: StoredDraftMap = { ...localMap };
     for (const sc of serverScores) {
       const existingLocal = merged[sc.bandId];
-      // 未同期の下書きがローカルにあればローカルを優先維持し、それ以外はサーバー値を反映（ロック状態は保持）
+      // 未同期の下書きがローカルにあればローカルを優先維持し、それ以外はサーバー値を反映（既存のロック状態があれば保持、初回取得時は保存済みのため誤操作ロック）
       if (!existingLocal || (!existingLocal.dirty && sc.updatedAt >= existingLocal.localUpdatedAt)) {
         merged[sc.bandId] = {
           bandId: sc.bandId,
           techScore: sc.techScore,
           charmScore: sc.charmScore,
           comment: sc.comment,
-          locked: existingLocal?.locked ?? false,
+          locked: existingLocal ? existingLocal.locked : true,
           dirty: false,
           localUpdatedAt: sc.updatedAt,
         };
@@ -117,7 +117,12 @@ export function useScoreDrafts(
         const next = { ...prev };
         for (const bid of bandIds) {
           if (next[bid]) {
-            next[bid] = { ...next[bid], dirty: false, localUpdatedAt: Date.now() };
+            next[bid] = {
+              ...next[bid],
+              dirty: false,
+              locked: true,
+              localUpdatedAt: Date.now(),
+            };
           }
         }
         persistToStorage(next);
