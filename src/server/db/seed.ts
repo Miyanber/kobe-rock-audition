@@ -8,6 +8,33 @@ import {
   auditionVoters,
   scores,
 } from './schema.ts';
+import { buildRealisticSeedData } from './seed-data.ts';
+
+async function insertInChunks<T>(
+  rows: T[],
+  chunkSize: number,
+  insertFn: (chunk: T[]) => Promise<unknown>,
+): Promise<void> {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    await insertFn(rows.slice(i, i + chunkSize));
+  }
+}
+
+export async function ensureRealisticSeedData(db: AppDb): Promise<void> {
+  const [{ total }] = await db.select({ total: count() }).from(users);
+  if (total > 0) return;
+
+  const data = buildRealisticSeedData(Date.now());
+
+  await insertInChunks(data.users, 100, (chunk) => db.insert(users).values(chunk));
+  await insertInChunks(data.auditions, 50, (chunk) => db.insert(auditions).values(chunk));
+  await insertInChunks(data.bands, 100, (chunk) => db.insert(bands).values(chunk));
+  await insertInChunks(data.bandMembers, 100, (chunk) => db.insert(bandMembers).values(chunk));
+  await insertInChunks(data.auditionVoters, 100, (chunk) =>
+    db.insert(auditionVoters).values(chunk),
+  );
+  await insertInChunks(data.scores, 100, (chunk) => db.insert(scores).values(chunk));
+}
 
 export async function ensureSeedData(db: AppDb): Promise<void> {
   const [{ total }] = await db.select({ total: count() }).from(users);
@@ -112,7 +139,6 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
   ]);
 
   await db.insert(bands).values([
-    // ACTIVE オーディションの出演バンド
     {
       id: 'b-win-1',
       auditionId: 'aud-2026-winter',
@@ -153,7 +179,6 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
       createdAt: now,
       updatedAt: now,
     },
-    // DRAFT オーディションのバンド（Wiki編集テスト用）
     {
       id: 'b-spr-1',
       auditionId: 'aud-2027-spring',
@@ -164,7 +189,6 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
       createdAt: now,
       updatedAt: now,
     },
-    // CLOSED 過去オーディションのバンド
     {
       id: 'b-sum-1',
       auditionId: 'aud-2026-summer',
@@ -188,7 +212,6 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
   ]);
 
   await db.insert(bandMembers).values([
-    // u-multi は b-win-1 と b-win-3 を掛け持ち
     { id: 'bm-1', bandId: 'b-win-1', userId: 'u-multi', instrument: 'Gt/Vo', createdAt: now },
     { id: 'bm-2', bandId: 'b-win-1', userId: 'u-voter2', instrument: 'Dr', createdAt: now },
     { id: 'bm-3', bandId: 'b-win-2', userId: 'u-voter1', instrument: 'Ba', createdAt: now },
@@ -200,35 +223,28 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
   ]);
 
   await db.insert(auditionVoters).values([
-    // 2026 冬
     { id: 'av-1', auditionId: 'aud-2026-winter', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
     { id: 'av-2', auditionId: 'aud-2026-winter', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null },
     { id: 'av-3', auditionId: 'aud-2026-winter', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
     { id: 'av-4', auditionId: 'aud-2026-winter', userId: 'u-voter2', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null },
     { id: 'av-5', auditionId: 'aud-2026-winter', userId: 'u-comment', permissionType: 'COMMENT_ONLY', isSubmitted: true, submittedAt: now },
-    // 2026 夏
     { id: 'av-6', auditionId: 'aud-2026-summer', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
     { id: 'av-7', auditionId: 'aud-2026-summer', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
     { id: 'av-8', auditionId: 'aud-2026-summer', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
   ]);
 
   await db.insert(scores).values([
-    // u-admin (b-win-4 は自バンドなので採点対象外)
     { id: 'sc-1', auditionId: 'aud-2026-winter', bandId: 'b-win-1', evaluatorUserId: 'u-admin', techScore: 42, charmScore: 40, comment: 'リズム隊の安定感とギターの抜けるトーンが素晴らしい。', createdAt: now, updatedAt: now },
     { id: 'sc-2', auditionId: 'aud-2026-winter', bandId: 'b-win-2', evaluatorUserId: 'u-admin', techScore: 38, charmScore: 44, comment: 'ボーカルの表現力とステージングが印象的でした。', createdAt: now, updatedAt: now },
     { id: 'sc-3', auditionId: 'aud-2026-winter', bandId: 'b-win-3', evaluatorUserId: 'u-admin', techScore: 35, charmScore: 32, comment: '中盤のダイナミクスをもう少し強調すると更に良くなります。', createdAt: now, updatedAt: now },
-    // u-voter1 (b-win-2 は自バンド)
     { id: 'sc-4', auditionId: 'aud-2026-winter', bandId: 'b-win-1', evaluatorUserId: 'u-voter1', techScore: 40, charmScore: 38, comment: 'サビの爆発力に引き込まれました！', createdAt: now, updatedAt: now },
     { id: 'sc-5', auditionId: 'aud-2026-winter', bandId: 'b-win-3', evaluatorUserId: 'u-voter1', techScore: 36, charmScore: 39, comment: 'グルーヴが心地よく、アレンジに工夫を感じました。', createdAt: now, updatedAt: now },
     { id: 'sc-6', auditionId: 'aud-2026-winter', bandId: 'b-win-4', evaluatorUserId: 'u-voter1', techScore: 44, charmScore: 46, comment: '圧倒的な完成度と観客の巻き込み方でした。', createdAt: now, updatedAt: now },
-    // u-comment (COMMENT_ONLY)
     { id: 'sc-7', auditionId: 'aud-2026-winter', bandId: 'b-win-1', evaluatorUserId: 'u-comment', techScore: null, charmScore: null, comment: 'イントロから鳥肌が立ちました！', createdAt: now, updatedAt: now },
     { id: 'sc-8', auditionId: 'aud-2026-winter', bandId: 'b-win-2', evaluatorUserId: 'u-comment', techScore: null, charmScore: null, comment: 'ベースの音作りがかっこよかったです。', createdAt: now, updatedAt: now },
     { id: 'sc-9', auditionId: 'aud-2026-winter', bandId: 'b-win-3', evaluatorUserId: 'u-comment', techScore: null, charmScore: null, comment: 'MC含め会場の空気が最高でした。', createdAt: now, updatedAt: now },
     { id: 'sc-10', auditionId: 'aud-2026-winter', bandId: 'b-win-4', evaluatorUserId: 'u-comment', techScore: null, charmScore: null, comment: 'ライブの締めに相応しい迫力でした！', createdAt: now, updatedAt: now },
-    // 2026 夏の採点データ
     { id: 'sc-11', auditionId: 'aud-2026-summer', bandId: 'b-sum-2', evaluatorUserId: 'u-multi', techScore: 41, charmScore: 43, comment: 'ホーンとファンクカッティングが抜群。', createdAt: now, updatedAt: now },
     { id: 'sc-12', auditionId: 'aud-2026-summer', bandId: 'b-sum-1', evaluatorUserId: 'u-voter1', techScore: 39, charmScore: 38, comment: '爽やかなコーラスワークが最高。', createdAt: now, updatedAt: now },
   ]);
 }
-
