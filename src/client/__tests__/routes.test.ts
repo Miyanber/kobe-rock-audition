@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   NAV_ITEMS,
   buildDocumentTitle,
+  filterVisibleAuditions,
   getDefaultRouteForAudition,
   getPathForRoute,
   isAdminOnlyRoute,
+  isAuditionOlderThanSixMonths,
   isAuditionScopedRoute,
   pickDefaultAudition,
   resolveLocationFromPathname,
@@ -138,5 +140,36 @@ describe('クライアントルート定義', () => {
     expect(buildDocumentTitle('admin-users', active)).toBe(
       '部員管理 | Kobe Rock Audition',
     );
+  });
+
+  it('半年以上前のイベントをデフォルト非表示にし表示切替で再表示できる', () => {
+    const now = new Date('2026-11-19T12:00:00+09:00');
+    // 基準日 2026-11-19 の6ヶ月前は 2026-05-19
+    expect(isAuditionOlderThanSixMonths('2026-05-18', now)).toBe(true);
+    expect(isAuditionOlderThanSixMonths('2026-05-19', now)).toBe(false);
+    expect(isAuditionOlderThanSixMonths('2026-08-10', now)).toBe(false);
+
+    // 月末クランプ確認（2026-08-31 の6ヶ月前は 2026-02-28）
+    const augEnd = new Date('2026-08-31T12:00:00+09:00');
+    expect(isAuditionOlderThanSixMonths('2026-02-27', augEnd)).toBe(true);
+    expect(isAuditionOlderThanSixMonths('2026-02-28', augEnd)).toBe(false);
+
+    const oldEvent = makeAudition({
+      id: 'old-event',
+      status: 'CLOSED',
+      eventDate: '2026-05-01',
+    });
+    const recentEvent = makeAudition({
+      id: 'recent-event',
+      status: 'CLOSED',
+      eventDate: '2026-08-10',
+    });
+
+    expect(
+      filterVisibleAuditions([recentEvent, oldEvent], false, now).map((a) => a.id),
+    ).toEqual(['recent-event']);
+    expect(
+      filterVisibleAuditions([recentEvent, oldEvent], true, now).map((a) => a.id),
+    ).toEqual(['recent-event', 'old-event']);
   });
 });

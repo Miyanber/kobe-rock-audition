@@ -19,6 +19,9 @@ interface AdminAuditionHeaderProps {
   onGoToActiveScoring?: (auditionId: string) => void;
   onGoToDraftBands?: (auditionId: string) => void;
   actionSlot?: ReactNode;
+  showOldAuditions?: boolean;
+  oldAuditionCount?: number;
+  onToggleShowOldAuditions?: (show: boolean) => void;
 }
 
 export function StatusBadge({ status }: { status: AuditionDto['status'] }) {
@@ -43,6 +46,9 @@ export function AdminAuditionHeader({
   onGoToActiveScoring,
   onGoToDraftBands,
   actionSlot,
+  showOldAuditions = false,
+  oldAuditionCount = 0,
+  onToggleShowOldAuditions,
 }: AdminAuditionHeaderProps) {
   if (auditions.length === 0) {
     return null;
@@ -105,9 +111,26 @@ export function AdminAuditionHeader({
           </div>
         </div>
 
-        <p className="text-[11px] text-zinc-500">
-          ※操作や入力を行う前に、正しいイベントを選択しているかご確認ください。
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-[11px] text-zinc-500">
+            ※操作や入力を行う前に、正しいイベントを選択しているかご確認ください。
+          </p>
+          {(oldAuditionCount > 0 || showOldAuditions) &&
+            onToggleShowOldAuditions && (
+              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showOldAuditions}
+                  onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-zinc-300 text-slate-700"
+                />
+                <span>
+                  半年以上前のイベントを表示
+                  {oldAuditionCount > 0 ? ` (${oldAuditionCount}件)` : ''}
+                </span>
+              </label>
+            )}
+        </div>
       </div>
 
       {showActiveShortcut && activeAudition && onGoToActiveScoring && (

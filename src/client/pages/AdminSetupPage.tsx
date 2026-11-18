@@ -40,6 +40,9 @@ interface AdminSetupPageProps {
   showCreateModal: boolean;
   onOpenCreateModal: () => void;
   onCloseCreateModal: () => void;
+  showOldAuditions?: boolean;
+  oldAuditionCount?: number;
+  onToggleShowOldAuditions?: (show: boolean) => void;
 }
 
 type SetupSectionId =
@@ -84,6 +87,9 @@ export function AdminSetupPage({
   showCreateModal,
   onOpenCreateModal,
   onCloseCreateModal,
+  showOldAuditions = false,
+  oldAuditionCount = 0,
+  onToggleShowOldAuditions,
 }: AdminSetupPageProps) {
   // 新規オーディション作成モーダル
   const [newTitle, setNewTitle] = useState('');
@@ -705,12 +711,25 @@ export function AdminSetupPage({
       {!selectedAudition ? (
         <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-3">
           <p className="text-sm font-bold text-zinc-700">
-            まだオーディションが作成されていません
+            {oldAuditionCount > 0 && !showOldAuditions
+              ? '直近6ヶ月以内のイベントがまだありません'
+              : 'まだオーディションが作成されていません'}
           </p>
           <p className="text-xs text-zinc-500">
-            まずは新しい開催回を作成して、バンド募集や参加権限の設定を始めましょう。
+            {oldAuditionCount > 0 && !showOldAuditions
+              ? `半年以上前のイベントが ${oldAuditionCount}件非表示になっています。過去のイベントを表示するか、新しい開催回を作成してください。`
+              : 'まずは新しい開催回を作成して、バンド募集や参加権限の設定を始めましょう。'}
           </p>
-          <div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {oldAuditionCount > 0 && !showOldAuditions && onToggleShowOldAuditions && (
+              <button
+                type="button"
+                onClick={() => onToggleShowOldAuditions(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-800 text-sm font-bold transition cursor-pointer"
+              >
+                半年以上前のイベントを表示 ({oldAuditionCount}件)
+              </button>
+            )}
             <button
               type="button"
               onClick={openCreateModal}
@@ -1510,6 +1529,30 @@ export function AdminSetupPage({
                   </div>
                 )}
               </section>
+
+              {/* 詳細設定: 過去イベント表示 */}
+              {onToggleShowOldAuditions && (
+                <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
+                  <div className="space-y-0.5">
+                    <h2 className="text-sm font-bold text-zinc-800">
+                      表示設定：半年以上前のイベントを表示
+                    </h2>
+                    <p className="text-xs text-zinc-500">
+                      開催日から半年以上経過したイベントは一覧の整理のためデフォルトで非表示になります。過去イベントを選択・閲覧する場合はONにしてください。
+                      {oldAuditionCount > 0 && `（対象イベント: ${oldAuditionCount}件）`}
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white text-xs font-bold text-zinc-800 cursor-pointer shrink-0 select-none">
+                    <input
+                      type="checkbox"
+                      checked={showOldAuditions}
+                      onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                    />
+                    <span>{showOldAuditions ? '表示中' : '非表示'}</span>
+                  </label>
+                </section>
+              )}
 
               {/* 詳細設定: 点差補正定数 */}
               <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">

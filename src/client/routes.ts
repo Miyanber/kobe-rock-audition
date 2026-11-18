@@ -211,6 +211,58 @@ export function sortAuditionsDesc<
   });
 }
 
+/**
+ * JST基準の現在日付から6ヶ月前の日付より開催日が前かどうかを判定する。
+ */
+export function isAuditionOlderThanSixMonths(
+  eventDate: string,
+  now: Date = new Date(),
+): boolean {
+  const trimmed = eventDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return false;
+  }
+
+  const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const targetYear = jstNow.getUTCFullYear();
+  const targetMonth = jstNow.getUTCMonth() - 6;
+  const day = jstNow.getUTCDate();
+
+  const firstOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth, 1));
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(
+      firstOfTargetMonth.getUTCFullYear(),
+      firstOfTargetMonth.getUTCMonth() + 1,
+      0,
+    ),
+  ).getUTCDate();
+  const cutoff = new Date(
+    Date.UTC(
+      firstOfTargetMonth.getUTCFullYear(),
+      firstOfTargetMonth.getUTCMonth(),
+      Math.min(day, lastDayOfTargetMonth),
+    ),
+  );
+  const cutoffDateStr = cutoff.toISOString().slice(0, 10);
+
+  return trimmed.slice(0, 10) < cutoffDateStr;
+}
+
+export function filterVisibleAuditions<
+  T extends Pick<AuditionDto, 'eventDate'>,
+>(
+  auditions: readonly T[],
+  showOldAuditions: boolean,
+  now: Date = new Date(),
+): T[] {
+  if (showOldAuditions) {
+    return [...auditions];
+  }
+  return auditions.filter(
+    (a) => !isAuditionOlderThanSixMonths(a.eventDate, now),
+  );
+}
+
 export function pickDefaultAudition(
   auditions: readonly AuditionDto[],
 ): AuditionDto | null {
