@@ -49,6 +49,14 @@ function getEffectiveScoringDeadline(
   return audition.scoringDeadline ?? audition.deadline;
 }
 
+function countUnsubmittedRequiredVoters(
+  generalFeedbacks: Array<{ permissionType: string; isSubmitted: boolean }>,
+): number {
+  return generalFeedbacks.filter(
+    (g) => g.permissionType === 'SCORE_AND_COMMENT' && !g.isSubmitted,
+  ).length;
+}
+
 async function loadAuditionHighlights(db: AppDb) {
   const [activeAudition] = await db
     .select()
@@ -299,6 +307,20 @@ export const auditionRoutes = new Hono<AppEnv>()
       );
     }
 
+    const unsubmittedRequiredCount = countUnsubmittedRequiredVoters(
+      loaded.aggregation.generalFeedbacks,
+    );
+    if (unsubmittedRequiredCount > 0) {
+      return c.json(
+        {
+          error:
+            '採点必須の対象者に未提出者がいるため、集計結果はまだ閲覧できません。',
+          unsubmittedRequiredCount,
+        },
+        403,
+      );
+    }
+
     return c.json({
       audition: loaded.audition,
       rankings: loaded.aggregation.bandResults.map((b) => ({
@@ -353,6 +375,20 @@ export const auditionRoutes = new Hono<AppEnv>()
         {
           error:
             'エクスポートはステータスが「採点終了・集計」のイベントのみ利用できます。',
+        },
+        403,
+      );
+    }
+
+    const unsubmittedRequiredCount = countUnsubmittedRequiredVoters(
+      loaded.aggregation.generalFeedbacks,
+    );
+    if (unsubmittedRequiredCount > 0) {
+      return c.json(
+        {
+          error:
+            '採点必須の対象者に未提出者がいるため、エクスポートはまだ利用できません。',
+          unsubmittedRequiredCount,
         },
         403,
       );

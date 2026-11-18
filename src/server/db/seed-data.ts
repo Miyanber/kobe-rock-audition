@@ -485,34 +485,30 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   });
 
-  // Fixed demo self-band assignments so core dev accounts behave as documented
+  // Fixed demo self-band assignments aligned with null cells in EXCEL_SCORE_MATRIX
   addMember('b-win-1', 'u-multi', 'Gt/Vo');
   addMember('b-win-1', 'u-voter2', 'Dr');
   addMember('b-win-2', 'u-voter1', 'Ba');
-  addMember('b-win-3', 'u-multi', 'Gt');
+  addMember('b-win-9', 'u-multi', 'Gt');
   addMember('b-win-4', 'u-admin', 'Vo');
 
-  // Map the 69 Excel rows to submitted SCORE_AND_COMMENT voters:
-  // row 20 (null at band4) -> u-admin, row 10 (null at band2) -> u-voter1, remaining 67 rows -> extraMembers[0..66]
+  // Map all 69 Excel rows to submitted SCORE_AND_COMMENT voters (0 unsubmitted):
+  // row 20 (null at band4) -> u-admin, row 10 (null at band2) -> u-voter1,
+  // row 19 (null at band1, band9) -> u-multi, row 41 (null at band1) -> u-voter2,
+  // remaining 65 rows -> extraMembers[0..64]
   const extraMembers = userList.slice(6); // 119 users
   const remainingMatrixIndices = Array.from({ length: EXCEL_SCORE_MATRIX.length }, (_, i) => i).filter(
-    (i) => i !== 10 && i !== 20,
+    (i) => i !== 10 && i !== 19 && i !== 20 && i !== 41,
   );
   const winterScoreVoters: Array<{ userId: string; submitted: boolean; matrixIdx: number }> = [
     { userId: 'u-admin', submitted: true, matrixIdx: 20 },
     { userId: 'u-voter1', submitted: true, matrixIdx: 10 },
-    { userId: 'u-multi', submitted: false, matrixIdx: -1 },
-    { userId: 'u-voter2', submitted: false, matrixIdx: -1 },
+    { userId: 'u-multi', submitted: true, matrixIdx: 19 },
+    { userId: 'u-voter2', submitted: true, matrixIdx: 41 },
     ...remainingMatrixIndices.map((mIdx, i) => ({
       userId: extraMembers[i].id,
       submitted: true,
       matrixIdx: mIdx,
-    })),
-    // Unsubmitted SCORE_AND_COMMENT voters (extraMembers[67..82])
-    ...extraMembers.slice(67, 83).map((u) => ({
-      userId: u.id,
-      submitted: false,
-      matrixIdx: -1,
     })),
   ];
 
@@ -639,7 +635,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   for (let i = 95; i < 112; i++) {
     winterCommentVoters.push({
       userId: extraMembers[i].id,
-      submitted: i < 108, // 13 submitted + u-comment = 14 submitted, 4 unsubmitted
+      submitted: true,
     });
   }
 

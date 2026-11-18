@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Award, Download, FileSpreadsheet, RefreshCw } from 'lucide-react';
+import { Award, Clock, Download, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
 import type { AuditionScopedRoute } from '../routes.ts';
@@ -107,13 +107,35 @@ export function VoterResultsPage({
   }
 
   if (error) {
+    const isPendingSubmission = error.includes('未提出');
     return (
-      <div className="max-w-2xl mx-auto bg-rose-50 border border-rose-200 rounded-sm p-6 text-center space-y-3">
-        <p className="text-sm font-medium text-rose-800">{error}</p>
+      <div
+        className={`max-w-2xl mx-auto border rounded-sm p-6 text-center space-y-3 ${
+          isPendingSubmission
+            ? 'bg-amber-50 border-amber-200'
+            : 'bg-rose-50 border-rose-200'
+        }`}
+      >
+        {isPendingSubmission && (
+          <div className="mx-auto h-10 w-10 rounded-sm bg-amber-100 flex items-center justify-center">
+            <Clock className="h-5 w-5 text-amber-700" />
+          </div>
+        )}
+        <p
+          className={`text-sm font-medium ${
+            isPendingSubmission ? 'text-amber-900' : 'text-rose-800'
+          }`}
+        >
+          {error}
+        </p>
         <button
           type="button"
           onClick={() => void loadResults(audition.id)}
-          className="px-4 py-2 rounded-sm bg-rose-700 text-white text-sm font-medium cursor-pointer"
+          className={`px-4 py-2 rounded-sm text-white text-sm font-medium cursor-pointer ${
+            isPendingSubmission
+              ? 'bg-amber-700 hover:bg-amber-800'
+              : 'bg-rose-700 hover:bg-rose-800'
+          }`}
         >
           再読み込み
         </button>

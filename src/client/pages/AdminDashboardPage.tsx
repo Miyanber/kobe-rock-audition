@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   FileSpreadsheet,
+  Lock,
   RefreshCw,
   Sliders,
 } from 'lucide-react';
@@ -32,10 +36,18 @@ export function AdminDashboardPage({
   const [results, setResults] = useState<AdminResultsResponse | null>(null);
   const [votersData, setVotersData] = useState<{
     voters: AdminVoterMonitorDto[];
-    summary: { totalVoters: number; submittedCount: number; unsubmittedCount: number };
+    summary: {
+      totalVoters: number;
+      submittedCount: number;
+      unsubmittedCount: number;
+      requiredTotalCount?: number;
+      requiredSubmittedCount?: number;
+      requiredUnsubmittedCount?: number;
+    };
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComparison, setShowComparison] = useState(false);
+  const [forceShowRanking, setForceShowRanking] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'ranking' | 'voters' | 'generalFeedback'
   >('ranking');
@@ -61,6 +73,9 @@ export function AdminDashboardPage({
             totalVoters: number;
             submittedCount: number;
             unsubmittedCount: number;
+            requiredTotalCount?: number;
+            requiredSubmittedCount?: number;
+            requiredUnsubmittedCount?: number;
           };
         }>(`/api/admin/auditions/${selectedAuditionId}/voters`),
       ]);
@@ -79,6 +94,7 @@ export function AdminDashboardPage({
   }, [selectedAuditionId]);
 
   useEffect(() => {
+    setForceShowRanking(false);
     void loadDashboard();
   }, [loadDashboard]);
 
@@ -191,6 +207,21 @@ export function AdminDashboardPage({
     if (showEmptyFeedbacks) return generalFeedbacks;
     return generalFeedbacks.filter((g) => g.generalFeedback.trim().length > 0);
   }, [generalFeedbacks, showEmptyFeedbacks]);
+
+  const requiredVoters = useMemo(
+    () =>
+      generalFeedbacks.filter((g) => g.permissionType === 'SCORE_AND_COMMENT'),
+    [generalFeedbacks],
+  );
+  const requiredTotalCount =
+    votersData?.summary.requiredTotalCount ?? requiredVoters.length;
+  const requiredSubmittedCount =
+    votersData?.summary.requiredSubmittedCount ??
+    requiredVoters.filter((v) => v.isSubmitted).length;
+  const requiredUnsubmittedCount =
+    votersData?.summary.requiredUnsubmittedCount ??
+    requiredVoters.filter((v) => !v.isSubmitted).length;
+  const isRankingHiddenByDefault = requiredUnsubmittedCount > 0;
 
   return (
     <div className="space-y-5">
@@ -307,8 +338,68 @@ export function AdminDashboardPage({
       {loading ? (
         <div className="py-12 text-center text-sm text-zinc-500">集計中...</div>
       ) : activeTab === 'ranking' ? (
-        <div className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden">
-          <div className="overflow-x-auto">
+        isRankingHiddenByDefault && !forceShowRanking ? (
+          <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
+            <div className="mx-auto h-12 w-12 rounded-sm bg-amber-50 border border-amber-200 flex items-center justify-center">
+              <Lock className="h-6 w-6 text-amber-700" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base sm:text-lg font-bold text-zinc-800">
+                採点必須者全員が提出するまでランキングは非表示です
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">
+                現在、採点必須（採点＋コメント）の対象者{' '}
+                <strong className="text-zinc-800">{requiredTotalCount}名</strong> 中{' '}
+                <strong className="text-emerald-700">{requiredSubmittedCount}名</strong> が提出済み、
+                <strong className="text-rose-700">{requiredUnsubmittedCount}名</strong> が未提出です。
+                <br />
+                未提出者が 0名になると、一般画面および管理画面のランキングが自動的に表示されます。
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlyUnsubmitted(true);
+                  setActiveTab('voters');
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition cursor-pointer"
+              >
+                <Clock className="h-4 w-4" />
+                提出状況タブを確認する
+              </button>
+              <button
+                type="button"
+                onClick={() => setForceShowRanking(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-semibold transition cursor-pointer"
+              >
+                <Eye className="h-4 w-4" />
+                未提出ありでもランキングをプレビュー表示する
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {isRankingHiddenByDefault && forceShowRanking && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-sm px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0" />
+                  <span>
+                    採点必須者に未提出者が <strong>{requiredUnsubmittedCount}名</strong> いるため、管理者プレビューとして暫定表示しています（一般部員には非公開です）。
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForceShowRanking(false)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm border border-amber-300 bg-white hover:bg-amber-100 text-amber-900 font-bold shrink-0 cursor-pointer"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  非表示に戻す
+                </button>
+              </div>
+            )}
+            <div className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden">
+              <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="bg-zinc-100 border-b border-zinc-300 text-zinc-700 font-bold">
@@ -462,8 +553,10 @@ export function AdminDashboardPage({
                 )}
               </tbody>
             </table>
+              </div>
+            </div>
           </div>
-        </div>
+        )
       ) : activeTab === 'voters' ? (
         <div className="space-y-4">
           <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 flex flex-wrap items-center justify-between gap-3">

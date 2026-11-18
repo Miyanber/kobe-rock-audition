@@ -563,6 +563,10 @@ export const adminRoutes = new Hono<AppEnv>()
       };
     });
 
+    const requiredVoters = voters.filter(
+      (v) => v.permissionType === 'SCORE_AND_COMMENT',
+    );
+
     return c.json({
       audition,
       voters,
@@ -570,6 +574,10 @@ export const adminRoutes = new Hono<AppEnv>()
         totalVoters: voters.length,
         submittedCount: voters.filter((v) => v.isSubmitted).length,
         unsubmittedCount: voters.filter((v) => !v.isSubmitted).length,
+        requiredTotalCount: requiredVoters.length,
+        requiredSubmittedCount: requiredVoters.filter((v) => v.isSubmitted).length,
+        requiredUnsubmittedCount: requiredVoters.filter((v) => !v.isSubmitted)
+          .length,
       },
     });
   })

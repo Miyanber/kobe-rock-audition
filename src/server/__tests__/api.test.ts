@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { createApp } from '../app.ts';
 import { createInMemoryTestDb } from '../db/local.ts';
 import { ensureSeedData } from '../db/seed.ts';
+import { buildRealisticSeedData } from '../db/seed-data.ts';
 import type { AppDb } from '../db/client.ts';
 
 function extractSessionCookie(res: Response): string {
@@ -1290,6 +1291,179 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       },
     );
     expect(afterSubmitResubmit.status).toBe(403);
+  });
+
+  it('採点必須者全員が提出するまで一般向け結果・エクスポートが403となり、六甲祭テストデータの未提出者が0である', async () => {
+    const adminCookie = await loginAs('u-admin');
+    const voter1Cookie = await loginAs('u-voter1');
+    const multiCookie = await loginAs('u-multi');
+    const voter2Cookie = await loginAs('u-voter2');
+
+    // 1) buildRealisticSeedData() の六甲祭 (aud-2026-winter) に未提出者が0であること
+    const realistic = buildRealisticSeedData();
+    const winterVoters = realistic.auditionVoters.filter(
+      (v) => v.auditionId === 'aud-2026-winter',
+    );
+    expect(winterVoters.length).toBeGreaterThan(0);
+    expect(winterVoters.filter((v) => !v.isSubmitted)).toHaveLength(0);
+    // 自バンドへのスコアが含まれていないことも検証
+    const winterMembersByBand = new Map<string, Set<string>>();
+    for (const bm of realistic.bandMembers) {
+      if (!bm.bandId.startsWith('b-win-')) continue;
+      const set = winterMembersByBand.get(bm.bandId) ?? new Set<string>();
+      set.add(bm.userId);
+      winterMembersByBand.set(bm.bandId, set);
+    }
+    const winterScores = realistic.scores.filter(
+      (s) => s.auditionId === 'aud-2026-winter',
+    );
+    expect(
+      winterScores.some((s) =>
+        winterMembersByBand.get(s.bandId)?.has(s.evaluatorUserId),
+      ),
+    ).toBe(false);
+
+    // 2) ensureSeedData の aud-2026-winter は u-multi, u-voter2 が未提出のため、CLOSEDにしても一般結果は403
+    await app.request('/api/admin/auditions/aud-2026-winter/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({ status: 'CLOSED' }),
+    });
+
+    const votersBeforeRes = await app.request(
+      '/api/admin/auditions/aud-2026-winter/voters',
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(votersBeforeRes.status).toBe(200);
+    const votersBeforeBody = (await votersBeforeRes.json()) as {
+      summary: {
+        requiredTotalCount: number;
+        requiredSubmittedCount: number;
+        requiredUnsubmittedCount: number;
+      };
+    };
+    expect(votersBeforeBody.summary.requiredUnsubmittedCount).toBe(2);
+
+    const blockedResultsRes = await app.request(
+      '/api/auditions/aud-2026-winter/results',
+      { headers: { Cookie: voter1Cookie } },
+    );
+    expect(blockedResultsRes.status).toBe(403);
+    const blockedResultsBody = (await blockedResultsRes.json()) as {
+      unsubmittedRequiredCount: number;
+    };
+    expect(blockedResultsBody.unsubmittedRequiredCount).toBe(2);
+
+    const blockedExportRes = await app.request(
+      '/api/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',
+      { headers: { Cookie: voter1Cookie } },
+    );
+    expect(blockedExportRes.status).toBe(403);
+
+    // 3) ACTIVEに戻して未提出2名（u-multi, u-voter2）が全員提出する。
+    // あわせて未提出の COMMENT_ONLY 部員を1名追加しても、SCORE_AND_COMMENT 全員提出済みなら閲覧可能であることを確認
+    await app.request('/api/admin/auditions/aud-2026-winter/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        status: 'ACTIVE',
+        scoringDeadline: '2027-01-01T23:59',
+      }),
+    });
+
+    await app.request('/api/admin/auditions/aud-2026-winter/voters/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        mode: 'BY_IDS',
+        userIds: ['u-unregistered'],
+        permissionType: 'COMMENT_ONLY',
+        action: 'ASSIGN',
+      }),
+    });
+
+    // u-multi (b-win-1, b-win-3 所属) の対象は b-win-2, b-win-4
+    const multiSubmit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: multiCookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 40, charmScore: 40, comment: '良い' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 42, comment: '最高' },
+          ],
+          generalFeedback: '全体総括 multi',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(multiSubmit.status).toBe(200);
+
+    // u-voter2 (b-win-1 所属) の対象は b-win-2, b-win-3, b-win-4
+    const voter2Submit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 39, charmScore: 39, comment: '良い' },
+            { bandId: 'b-win-3', techScore: 37, charmScore: 38, comment: '楽しい' },
+            { bandId: 'b-win-4', techScore: 41, charmScore: 41, comment: '熱い' },
+          ],
+          generalFeedback: '全体総括 voter2',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(voter2Submit.status).toBe(200);
+
+    await app.request('/api/admin/auditions/aud-2026-winter/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({ status: 'CLOSED' }),
+    });
+
+    const votersAfterRes = await app.request(
+      '/api/admin/auditions/aud-2026-winter/voters',
+      { headers: { Cookie: adminCookie } },
+    );
+    const votersAfterBody = (await votersAfterRes.json()) as {
+      summary: { requiredUnsubmittedCount: number; unsubmittedCount: number };
+    };
+    expect(votersAfterBody.summary.requiredUnsubmittedCount).toBe(0);
+    expect(votersAfterBody.summary.unsubmittedCount).toBe(1);
+
+    const allowedResultsRes = await app.request(
+      '/api/auditions/aud-2026-winter/results',
+      { headers: { Cookie: voter1Cookie } },
+    );
+    expect(allowedResultsRes.status).toBe(200);
+
+    const allowedExportRes = await app.request(
+      '/api/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',
+      { headers: { Cookie: voter1Cookie } },
+    );
+    expect(allowedExportRes.status).toBe(200);
   });
 });
 
