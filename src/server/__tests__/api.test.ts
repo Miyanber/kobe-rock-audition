@@ -589,6 +589,7 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     const closedResultsBody = (await closedResultsRes.json()) as {
       audition: { id: string; status: string };
       rankings: Array<{ rank: number; bandName: string; activeFinalScore: number }>;
+      generalFeedbacks: Array<{ userId: string; userName: string; generalFeedback: string; email?: string }>;
       aggregation?: unknown;
       voteRecords?: unknown;
       evaluatorStats?: unknown;
@@ -596,6 +597,8 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(closedResultsBody.audition.id).toBe('aud-2026-summer');
     expect(closedResultsBody.rankings.length).toBeGreaterThan(0);
     expect(closedResultsBody.rankings[0].rank).toBe(1);
+    expect(closedResultsBody.generalFeedbacks.length).toBeGreaterThan(0);
+    expect(closedResultsBody.generalFeedbacks.every((g) => g.email === undefined)).toBe(true);
     expect(closedResultsBody.aggregation).toBeUndefined();
     expect(closedResultsBody.voteRecords).toBeUndefined();
     expect(closedResultsBody.evaluatorStats).toBeUndefined();
@@ -612,6 +615,22 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       { headers: { Cookie: voterCookie } },
     );
     expect(draftResultsRes.status).toBe(403);
+
+    // CLOSED オーディションは一般部員も Excel エクスポート可能、ACTIVE は 403
+    const voterExportOk = await app.request(
+      '/api/auditions/aud-2026-summer/export?target=summary_and_raw&format=xlsx',
+      { headers: { Cookie: voterCookie } },
+    );
+    expect(voterExportOk.status).toBe(200);
+    expect(voterExportOk.headers.get('content-type')).toContain(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+
+    const voterExportForbidden = await app.request(
+      '/api/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',
+      { headers: { Cookie: voterCookie } },
+    );
+    expect(voterExportForbidden.status).toBe(403);
   });
 
   it('BY_IDSでの一括権限付与とチャンク分割を伴う一括解除が正常に動作する', async () => {
@@ -901,6 +920,58 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       audition: { id: string; title: string };
     };
     expect(data.audition.id).toMatch(/^[a-hj-km-np-z2-9]{8}$/);
+  });
+
+  it('バンドメンバー候補APIは4回生以上を除外しメールアドレスを返さない', async () => {
+    const adminCookie = await loginAs('u-admin');
+    // 4回生以上 (enrollmentYear=2022) の引退部員を1名追加
+    const bulkRes = await app.request('/api/admin/users/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        csvText: '引退 太郎,ob-retired@stu.kobe-u.ac.jp,2022,VOTER',
+      }),
+    });
+    expect(bulkRes.status).toBe(200);
+
+    const voterCookie = await loginAs('u-voter1');
+    const selectableRes = await app.request('/api/auditions/users/selectable', {
+      headers: { Cookie: voterCookie },
+    });
+    expect(selectableRes.status).toBe(200);
+    const selectableData = (await selectableRes.json()) as {
+      users: Array<{ id: string; name: string; grade: number; email?: string }>;
+    };
+    expect(selectableData.users.length).toBeGreaterThan(0);
+    expect(selectableData.users.some((u) => u.name === '引退 太郎')).toBe(false);
+    expect(selectableData.users.every((u) => u.grade <= 3)).toBe(true);
+    expect(selectableData.users.every((u) => u.email === undefined)).toBe(true);
+
+    // /bands, /scoring, /current の各バンドメンバーにも email が含まれないこと
+    const [bandsRes, scoringRes, currentRes] = await Promise.all([
+      app.request('/api/auditions/aud-2026-winter/bands', {
+        headers: { Cookie: voterCookie },
+      }),
+      app.request('/api/auditions/aud-2026-winter/scoring', {
+        headers: { Cookie: voterCookie },
+      }),
+      app.request('/api/auditions/current', {
+        headers: { Cookie: voterCookie },
+      }),
+    ]);
+    for (const res of [bandsRes, scoringRes, currentRes]) {
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        bands: Array<{ members: Array<{ email?: string }> }>;
+      };
+      expect(body.bands.length).toBeGreaterThan(0);
+      for (const band of body.bands) {
+        expect(band.members.every((m) => m.email === undefined)).toBe(true);
+      }
+    }
   });
 });
 

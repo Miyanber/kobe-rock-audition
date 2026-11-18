@@ -16,13 +16,17 @@ import {
   loadBandsWithMembers,
 } from '../lib/audition-loader.ts';
 import {
+  generateBandCommentsExport,
+  generateSummaryAndRawExport,
+} from '../lib/export.ts';
+import {
   SubmitScoresSchema,
   UpsertBandSchema,
   UpsertGeneralFeedbackSchema,
   UpsertScoreSchema,
 } from '../../shared/schema/index.ts';
 import type { AppDb } from '../db/client.ts';
-import { calculateGrade } from '../../shared/grade.ts';
+import { calculateGrade, isActiveClubGrade } from '../../shared/grade.ts';
 
 async function loadAuditionHighlights(db: AppDb) {
   const [activeAudition] = await db
@@ -161,17 +165,18 @@ export const auditionRoutes = new Hono<AppEnv>()
       .select({
         id: users.id,
         name: users.name,
-        email: users.email,
         enrollmentYear: users.enrollmentYear,
       })
       .from(users)
       .orderBy(desc(users.enrollmentYear), asc(users.name));
 
     return c.json({
-      users: rows.map((u) => ({
-        ...u,
-        grade: calculateGrade(u.enrollmentYear),
-      })),
+      users: rows
+        .filter((u) => isActiveClubGrade(u.enrollmentYear))
+        .map((u) => ({
+          ...u,
+          grade: calculateGrade(u.enrollmentYear),
+        })),
     });
   })
   .get('/current', async (c) => {
@@ -293,6 +298,67 @@ export const auditionRoutes = new Hono<AppEnv>()
         appliedPenalty: b.appliedPenalty,
         activeFinalScore: b.activeFinalScore,
       })),
+      generalFeedbacks: loaded.aggregation.generalFeedbacks
+        .filter((g) => g.generalFeedback.trim().length > 0)
+        .map((g) => ({
+          userId: g.userId,
+          userName: g.userName,
+          grade:
+            g.enrollmentYear !== undefined
+              ? calculateGrade(g.enrollmentYear)
+              : undefined,
+          permissionType: g.permissionType,
+          submittedAt: g.submittedAt,
+          generalFeedback: g.generalFeedback,
+        })),
+    });
+  })
+  .get('/:id/export', async (c) => {
+    const db = c.get('db');
+    const auditionId = c.req.param('id');
+    const target =
+      c.req.query('target') === 'band_comments'
+        ? 'band_comments'
+        : 'summary_and_raw';
+    const format = c.req.query('format') === 'csv' ? 'csv' : 'xlsx';
+
+    const loaded = await loadAuditionAggregation(db, auditionId);
+    if (!loaded) {
+      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    }
+
+    if (loaded.audition.status !== 'CLOSED') {
+      return c.json(
+        {
+          error:
+            'エクスポートはステータスが「採点終了・集計」のイベントのみ利用できます。',
+        },
+        403,
+      );
+    }
+
+    const exported =
+      target === 'band_comments'
+        ? generateBandCommentsExport(
+            loaded.audition.title,
+            loaded.aggregation,
+            format,
+          )
+        : generateSummaryAndRawExport(
+            loaded.audition.title,
+            loaded.audition.eventDate,
+            loaded.aggregation,
+            format,
+          );
+
+    const encodedFilename = encodeURIComponent(exported.filename);
+    return new Response(Buffer.from(exported.data), {
+      status: 200,
+      headers: {
+        'Content-Type': exported.contentType,
+        'Content-Disposition': `attachment; filename="export.${format}"; filename*=UTF-8''${encodedFilename}`,
+        'Cache-Control': 'no-store',
+      },
     });
   })
   .get('/:id/bands', async (c) => {
