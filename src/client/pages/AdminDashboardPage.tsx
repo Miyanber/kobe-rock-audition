@@ -11,10 +11,13 @@ import {
   EyeOff,
   FileSpreadsheet,
   Lock,
+  MessageSquareText,
   RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Sliders,
+  X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { ToastNotification } from '../components/ToastNotification.tsx';
@@ -23,12 +26,17 @@ import type {
   AdminVoterMonitorDto,
   AuditionDto,
 } from '../types.ts';
+import { round2 } from '../../shared/aggregation.ts';
 import { getAuditionStatusLabel } from '../../shared/audition-status.ts';
 import { calculateGrade } from '../../shared/grade.ts';
-import type { AggregationMethod } from '../../shared/schema/index.ts';
+import type {
+  AggregationMethod,
+  PermissionType,
+} from '../../shared/schema/index.ts';
 
 export type AdminDashboardTab =
   | 'ranking'
+  | 'bandComments'
   | 'voters'
   | 'generalFeedback'
   | 'bandOrder';
@@ -68,6 +76,12 @@ export function AdminDashboardPage({
   );
   const [onlyUnsubmitted, setOnlyUnsubmitted] = useState(false);
   const [showEmptyFeedbacks, setShowEmptyFeedbacks] = useState(false);
+  const [selectedCommentBandId, setSelectedCommentBandId] =
+    useState<string>('ALL');
+  const [commentPermissionFilter, setCommentPermissionFilter] = useState<
+    'ALL' | PermissionType
+  >('ALL');
+  const [commentSearchQuery, setCommentSearchQuery] = useState('');
   const [penaltyDrafts, setPenaltyDrafts] = useState<Record<string, string>>({});
   const [slotBandIds, setSlotBandIds] = useState<string[]>([]);
   const [savingBandOrder, setSavingBandOrder] = useState(false);
@@ -120,6 +134,12 @@ export function AdminDashboardPage({
 
   useEffect(() => {
     setForceShowRanking(false);
+    setSelectedCommentBandId('ALL');
+    setCommentPermissionFilter('ALL');
+    setCommentSearchQuery('');
+  }, [selectedAuditionId]);
+
+  useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
 
@@ -296,6 +316,78 @@ export function AdminDashboardPage({
     }
   };
 
+  const orderedBandSummaries = useMemo(
+    () =>
+      [...(results?.aggregation.bandResults ?? [])].sort(
+        (a, b) => a.performanceOrder - b.performanceOrder,
+      ),
+    [results?.aggregation.bandResults],
+  );
+
+  const voteRecords = results?.aggregation.voteRecords ?? [];
+  const hasCommentFilter =
+    commentPermissionFilter !== 'ALL' || commentSearchQuery.trim() !== '';
+
+  const bandCommentGroups = useMemo(() => {
+    const normalizedQuery = commentSearchQuery.trim().toLowerCase();
+    const targetBands =
+      selectedCommentBandId === 'ALL'
+        ? orderedBandSummaries
+        : orderedBandSummaries.filter((b) => b.bandId === selectedCommentBandId);
+
+    const groups = targetBands.map((band) => {
+      // 自バンド除外および有効数値投票・コメントありの抽出条件は Excel エクスポート (generateBandCommentsExport) と一致させる
+      const allBandVotes = voteRecords.filter(
+        (v) =>
+          v.bandId === band.bandId &&
+          !v.isOwnBand &&
+          (v.isValidNumericVote || v.comment.trim().length > 0),
+      );
+      const filteredVotes = allBandVotes.filter((v) => {
+        if (
+          commentPermissionFilter !== 'ALL' &&
+          v.permissionType !== commentPermissionFilter
+        ) {
+          return false;
+        }
+        if (normalizedQuery) {
+          const matchesEvaluator = v.evaluatorName
+            .toLowerCase()
+            .includes(normalizedQuery);
+          const matchesComment = v.comment
+            .toLowerCase()
+            .includes(normalizedQuery);
+          if (!matchesEvaluator && !matchesComment) {
+            return false;
+          }
+        }
+        return true;
+      });
+      return {
+        band,
+        totalCount: allBandVotes.length,
+        votes: filteredVotes,
+      };
+    });
+
+    if (selectedCommentBandId === 'ALL' && hasCommentFilter) {
+      return groups.filter((g) => g.votes.length > 0);
+    }
+    return groups;
+  }, [
+    orderedBandSummaries,
+    selectedCommentBandId,
+    voteRecords,
+    commentPermissionFilter,
+    commentSearchQuery,
+    hasCommentFilter,
+  ]);
+
+  const totalMatchedBandComments = useMemo(
+    () => bandCommentGroups.reduce((sum, g) => sum + g.votes.length, 0),
+    [bandCommentGroups],
+  );
+
   if (auditions.length === 0) {
     return (
       <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center text-sm text-zinc-600">
@@ -420,6 +512,16 @@ export function AdminDashboardPage({
             }`}
         >
           ランキング ({bandResults.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('bandComments')}
+          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'bandComments'
+            ? 'bg-slate-700 text-white'
+            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
+            }`}
+        >
+          バンド別講評 ({orderedBandSummaries.length})
         </button>
         <button
           type="button"
@@ -583,6 +685,17 @@ export function AdminDashboardPage({
                       <div className="text-[11px] text-zinc-500">
                         {b.memberNames.join(', ') || 'メンバー未設定'}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCommentBandId(b.bandId);
+                          setActiveTab('bandComments');
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 hover:underline cursor-pointer"
+                      >
+                        <MessageSquareText className="h-3 w-3" />
+                        講評を見る ({b.commentCount})
+                      </button>
                     </td>
                     <td className="px-3 py-3 text-right font-mono">
                       {b.validVoteCount}
@@ -675,6 +788,235 @@ export function AdminDashboardPage({
             </div>
           </div>
         )
+      ) : activeTab === 'bandComments' ? (
+        <div className="space-y-4">
+          {/* 絞り込みツールバー */}
+          <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="text-sm font-bold text-zinc-800 flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4 text-slate-700" />
+                <span>バンド別講評・正規化後スコア一覧</span>
+                <span className="text-xs font-semibold text-zinc-500">
+                  （表示件数: {totalMatchedBandComments}件）
+                </span>
+              </div>
+              {(selectedCommentBandId !== 'ALL' || hasCommentFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCommentBandId('ALL');
+                    setCommentPermissionFilter('ALL');
+                    setCommentSearchQuery('');
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-900 hover:underline cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  絞り込みをリセット
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label
+                  htmlFor="band-comment-select"
+                  className="block text-xs font-bold text-zinc-700 mb-1"
+                >
+                  バンド選択
+                </label>
+                <select
+                  id="band-comment-select"
+                  value={selectedCommentBandId}
+                  onChange={(e) => setSelectedCommentBandId(e.target.value)}
+                  className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-zinc-800 focus:border-slate-700 focus:outline-none"
+                >
+                  <option value="ALL">
+                    すべてのバンド ({orderedBandSummaries.length}組)
+                  </option>
+                  {orderedBandSummaries.map((b) => (
+                    <option key={b.bandId} value={b.bandId}>
+                      #{b.performanceOrder} {b.bandName} ({b.commentCount}件)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="band-comment-permission-filter"
+                  className="block text-xs font-bold text-zinc-700 mb-1"
+                >
+                  権限区分
+                </label>
+                <select
+                  id="band-comment-permission-filter"
+                  value={commentPermissionFilter}
+                  onChange={(e) =>
+                    setCommentPermissionFilter(
+                      e.target.value as 'ALL' | PermissionType,
+                    )
+                  }
+                  className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-zinc-800 focus:border-slate-700 focus:outline-none"
+                >
+                  <option value="ALL">すべて</option>
+                  <option value="SCORE_AND_COMMENT">採点＋コメント</option>
+                  <option value="COMMENT_ONLY">コメントのみ</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="band-comment-search"
+                  className="block text-xs font-bold text-zinc-700 mb-1"
+                >
+                  キーワード検索（採点者名・コメント）
+                </label>
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="band-comment-search"
+                    type="text"
+                    value={commentSearchQuery}
+                    onChange={(e) => setCommentSearchQuery(e.target.value)}
+                    placeholder="採点者名やコメントで検索..."
+                    className="w-full rounded-sm border border-zinc-300 bg-white pl-8 pr-8 py-1.5 text-xs sm:text-sm focus:border-slate-700 focus:outline-none"
+                  />
+                  {commentSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setCommentSearchQuery('')}
+                      aria-label="検索をクリア"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {bandCommentGroups.length === 0 ? (
+            <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center text-sm text-zinc-500">
+              {orderedBandSummaries.length === 0
+                ? 'バンドが登録されていません'
+                : '条件に一致する講評コメントが見つかりませんでした'}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {bandCommentGroups.map(({ band, totalCount, votes }) => (
+                <div
+                  key={band.bandId}
+                  className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden"
+                >
+                  <div className="px-4 py-3 bg-zinc-100 border-b border-zinc-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-sm bg-slate-700 text-white text-xs font-bold">
+                          #{band.performanceOrder}
+                        </span>
+                        <h3 className="text-sm sm:text-base font-bold text-zinc-800">
+                          {band.bandName}
+                        </h3>
+                        {(!isRankingHiddenByDefault || forceShowRanking) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-white border border-zinc-300 text-xs font-bold text-slate-800">
+                            {band.rank}位{band.isTied ? ' (同率)' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500">
+                        メンバー: {band.memberNames.join(', ') || '未設定'}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                      <span className="px-2 py-1 rounded-sm bg-white border border-zinc-300 text-zinc-700">
+                        表示 {votes.length} / 全{totalCount}件（有効採点 {band.validVoteCount}）
+                      </span>
+                      {(!isRankingHiddenByDefault || forceShowRanking) && (
+                        <span className="px-2 py-1 rounded-sm bg-slate-700 text-white font-bold">
+                          平均 魅力 {round2(band.activeAvgNormCharm).toFixed(2)} / 技術{' '}
+                          {round2(band.activeAvgNormTech).toFixed(2)} / 最終{' '}
+                          {round2(band.activeFinalScore).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {votes.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-xs text-zinc-500 bg-white">
+                      （条件に一致する採点・コメントデータはありません）
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white">
+                      <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-600 font-bold">
+                            <th className="px-3 py-2.5 whitespace-nowrap">採点者名</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">権限区分</th>
+                            <th className="px-3 py-2.5 text-right whitespace-nowrap">
+                              正規化後_魅力点
+                            </th>
+                            <th className="px-3 py-2.5 text-right whitespace-nowrap">
+                              正規化後_技術点
+                            </th>
+                            <th className="px-3 py-2.5 text-right whitespace-nowrap">
+                              正規化後_合計点
+                            </th>
+                            <th className="px-3 py-2.5 min-w-[260px]">コメント</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {votes.map((v) => (
+                            <tr
+                              key={`${v.bandId}-${v.evaluatorUserId}`}
+                              className="hover:bg-zinc-50/80 align-top"
+                            >
+                              <td className="px-3 py-2.5 font-semibold text-zinc-800 whitespace-nowrap">
+                                {v.evaluatorName}
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-semibold ${
+                                    v.permissionType === 'SCORE_AND_COMMENT'
+                                      ? 'bg-slate-100 text-slate-700'
+                                      : 'bg-amber-50 text-amber-800'
+                                  }`}
+                                >
+                                  {v.permissionType === 'SCORE_AND_COMMENT'
+                                    ? '採点＋コメント'
+                                    : 'コメントのみ'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                {v.activeNormalized
+                                  ? round2(v.activeNormalized.normCharm).toFixed(2)
+                                  : '-'}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                {v.activeNormalized
+                                  ? round2(v.activeNormalized.normTech).toFixed(2)
+                                  : '-'}
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
+                                {v.activeNormalized
+                                  ? round2(v.activeNormalized.normTotal).toFixed(2)
+                                  : '-'}
+                              </td>
+                              <td className="px-3 py-2.5 text-zinc-700 leading-relaxed whitespace-pre-wrap break-words">
+                                {v.comment.trim() || '（コメントなし）'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : activeTab === 'voters' ? (
         <div className="space-y-4">
           <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 flex flex-wrap items-center justify-between gap-3">
