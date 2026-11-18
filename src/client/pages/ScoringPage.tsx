@@ -15,18 +15,24 @@ import {
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
+import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
 import { ToastNotification } from '../components/ToastNotification.tsx';
 import { useScoreDrafts } from '../hooks/useScoreDrafts.ts';
-import type { AuthUserDto, CurrentAuditionPayload } from '../types.ts';
-import type { AppRoute } from '../components/Layout.tsx';
+import type { AuditionScoringPayload, AuthUserDto } from '../types.ts';
+import type { AuditionScopedRoute } from '../routes.ts';
 
 interface ScoringPageProps {
   user: AuthUserDto;
-  onNavigate: (route: AppRoute) => void;
+  auditionId: string;
+  onNavigateToAudition: (auditionId: string, route: AuditionScopedRoute) => void;
 }
 
-export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
-  const [data, setData] = useState<CurrentAuditionPayload | null>(null);
+export function ScoringPage({
+  user,
+  auditionId,
+  onNavigateToAudition,
+}: ScoringPageProps) {
+  const [data, setData] = useState<AuditionScoringPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingBandId, setSavingBandId] = useState<string | null>(null);
@@ -37,24 +43,29 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
   } | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
-  const loadCurrent = useCallback(async () => {
+  const loadScoring = useCallback(async () => {
+    if (!auditionId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await apiJson<CurrentAuditionPayload>('/api/auditions/current');
+      const res = await apiJson<AuditionScoringPayload>(
+        `/api/auditions/${encodeURIComponent(auditionId)}/scoring`,
+      );
       setData(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : '読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [auditionId]);
 
   useEffect(() => {
-    void loadCurrent();
-  }, [loadCurrent]);
+    void loadScoring();
+  }, [loadScoring]);
 
-  const activeAudition = data?.activeAudition ?? null;
+  const targetAudition = data?.audition ?? null;
+  const activeAudition =
+    targetAudition?.status === 'ACTIVE' ? targetAudition : null;
   const voterEntry = data?.voterEntry ?? null;
 
   const {
@@ -173,7 +184,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
         body: JSON.stringify(payload),
       });
       markSaved(targetBands.map((b) => b.id));
-      await loadCurrent();
+      await loadScoring();
       setShowPreviewModal(false);
       showToast('success', '全対象バンドの採点・コメントを提出完了しました！');
     } catch (err) {
@@ -223,7 +234,7 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
         <p className="text-rose-800 font-medium">{error}</p>
         <button
           type="button"
-          onClick={loadCurrent}
+          onClick={loadScoring}
           className="px-4 py-2 rounded-sm bg-rose-700 text-white text-sm font-medium cursor-pointer"
         >
           再読み込み
@@ -232,50 +243,91 @@ export function ScoringPage({ user, onNavigate }: ScoringPageProps) {
     );
   }
 
-  // 1. 採点受付中のオーディションが存在しない場合
-  if (!activeAudition) {
-    const preparingAudition = data?.preparingAudition ?? data?.draftAudition ?? null;
+  // 1. 表示中のオーディションが採点受付中（ACTIVE）でない場合
+  if (!activeAudition || !targetAudition) {
+    const runningAudition = data?.activeAudition ?? null;
     const latestClosedAudition = data?.latestClosedAudition ?? null;
-    const isEntryClosed = preparingAudition?.status === 'ENTRY_CLOSED';
+    const status = targetAudition?.status;
+    const statusDesc =
+      status === 'DRAFT'
+        ? 'このオーディションは現在「バンド募集中」のため、まだ採点は開始されていません。'
+        : status === 'ENTRY_CLOSED'
+          ? 'このオーディションは現在「募集締切・調整中」のため、採点開始までお待ちください。'
+          : status === 'CLOSED'
+            ? 'このオーディションはすでに「採点終了・集計」済みのため、新規採点・修正はできません。'
+            : '採点受付が開始されるまでお待ちください。';
+
     return (
       <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
         <div className="mx-auto h-12 w-12 rounded-sm bg-zinc-100 flex items-center justify-center">
           <Music className="h-6 w-6 text-zinc-500" />
         </div>
+        {targetAudition && (
+          <div className="flex items-center justify-center gap-2">
+            <StatusBadge status={targetAudition.status} />
+          </div>
+        )}
         <h2 className="text-lg font-bold text-zinc-800">
-          現在、採点受付中のオーディションはありません
+          {targetAudition
+            ? `「${targetAudition.title}」は採点受付中ではありません`
+            : '現在、採点受付中のオーディションはありません'}
         </h2>
-        <p className="text-sm text-zinc-600">
-          {preparingAudition
-            ? isEntryClosed
-              ? `現在「${preparingAudition.title}」はバンド募集を締め切り、開催準備・調整中です。`
-              : `現在「${preparingAudition.title}」の出演バンド募集を受付中です。`
-            : '採点受付が開始されるまでお待ちください。'}
-        </p>
-        {(preparingAudition || latestClosedAudition) && (
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-            {preparingAudition && (
+        <p className="text-sm text-zinc-600">{statusDesc}</p>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+          {runningAudition && runningAudition.id !== targetAudition?.id && (
+            <button
+              type="button"
+              onClick={() =>
+                onNavigateToAudition(runningAudition.id, 'scoring')
+              }
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition cursor-pointer"
+            >
+              <Pencil className="h-4 w-4" />
+              採点受付中の「{runningAudition.title}」へ移動
+            </button>
+          )}
+          {targetAudition &&
+            (targetAudition.status === 'DRAFT' ||
+              targetAudition.status === 'ENTRY_CLOSED') && (
               <button
                 type="button"
-                onClick={() => onNavigate('wiki')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white font-semibold text-sm transition cursor-pointer"
+                onClick={() =>
+                  onNavigateToAudition(targetAudition.id, 'wiki')
+                }
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm transition cursor-pointer"
               >
                 <Music className="h-4 w-4" />
-                {isEntryClosed ? '登録バンド一覧を見る' : 'バンド登録・編集へ進む'}
+                {targetAudition.status === 'ENTRY_CLOSED'
+                  ? 'この回の登録バンド一覧を見る'
+                  : 'この回のバンド登録・編集へ進む'}
               </button>
             )}
-            {latestClosedAudition && (
+          {targetAudition && targetAudition.status === 'CLOSED' && (
+            <button
+              type="button"
+              onClick={() =>
+                onNavigateToAudition(targetAudition.id, 'results')
+              }
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm transition cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              この回の集計結果を見る
+            </button>
+          )}
+          {latestClosedAudition &&
+            latestClosedAudition.id !== targetAudition?.id && (
               <button
                 type="button"
-                onClick={() => onNavigate('results')}
+                onClick={() =>
+                  onNavigateToAudition(latestClosedAudition.id, 'results')
+                }
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 font-semibold text-sm transition cursor-pointer"
               >
                 <FileSpreadsheet className="h-4 w-4" />
                 「{latestClosedAudition.title}」の順位を見る
               </button>
             )}
-          </div>
-        )}
+        </div>
       </div>
     );
   }

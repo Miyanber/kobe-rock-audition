@@ -16,7 +16,6 @@ import {
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
-import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
 import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AdminVoterMonitorDto,
@@ -35,7 +34,11 @@ interface AdminSetupPageProps {
   auditions: AuditionDto[];
   selectedAuditionId: string;
   onSelectAudition: (id: string) => void;
-  onAuditionsChanged: () => Promise<void>;
+  onAuditionsChanged: () => Promise<AuditionDto[]>;
+  onAuditionDeleted: (remaining: AuditionDto[]) => void;
+  showCreateModal: boolean;
+  onOpenCreateModal: () => void;
+  onCloseCreateModal: () => void;
 }
 
 type SetupSectionId =
@@ -76,12 +79,22 @@ export function AdminSetupPage({
   selectedAuditionId,
   onSelectAudition,
   onAuditionsChanged,
+  onAuditionDeleted,
+  showCreateModal,
+  onOpenCreateModal,
+  onCloseCreateModal,
 }: AdminSetupPageProps) {
   // 新規オーディション作成モーダル
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newEventDate, setNewEventDate] = useState(getTodayDateString);
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (showCreateModal) {
+      setNewTitle('');
+      setNewEventDate(getTodayDateString());
+    }
+  }, [showCreateModal]);
 
   // 目次アクティブ状態
   const [activeSection, setActiveSection] =
@@ -340,9 +353,7 @@ export function AdminSetupPage({
   };
 
   const openCreateModal = () => {
-    setNewTitle('');
-    setNewEventDate(getTodayDateString());
-    setShowCreateModal(true);
+    onOpenCreateModal();
   };
 
   const handleCreateAudition = async (e: React.FormEvent) => {
@@ -358,7 +369,7 @@ export function AdminSetupPage({
           deadline: null,
         }),
       });
-      setShowCreateModal(false);
+      onCloseCreateModal();
       setNewTitle('');
       await onAuditionsChanged();
       onSelectAudition(res.audition.id);
@@ -401,7 +412,8 @@ export function AdminSetupPage({
       });
       setShowDeleteModal(false);
       setDeleteConfirmInput('');
-      await onAuditionsChanged();
+      const remaining = await onAuditionsChanged();
+      onAuditionDeleted(remaining);
       showToast(`オーディション「${deletedTitle}」を削除しました`);
     } finally {
       setDeletingAudition(false);
@@ -609,22 +621,6 @@ export function AdminSetupPage({
 
   return (
     <div className="space-y-6">
-      <AdminAuditionHeader
-        auditions={auditions}
-        selectedAuditionId={selectedAuditionId}
-        onSelectAudition={onSelectAudition}
-        actionSlot={
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shrink-0 transition cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>新規作成</span>
-          </button>
-        }
-      />
-
       <ToastNotification
         message={statusMessage ? { text: statusMessage, type: 'success' } : null}
         onClose={() => setStatusMessage(null)}
@@ -1465,7 +1461,7 @@ export function AdminSetupPage({
               <button
                 type="button"
                 disabled={creating}
-                onClick={() => setShowCreateModal(false)}
+                onClick={onCloseCreateModal}
                 aria-label="閉じる"
                 className="p-1 rounded-sm text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
               >
@@ -1509,7 +1505,7 @@ export function AdminSetupPage({
                 <button
                   type="button"
                   disabled={creating}
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={onCloseCreateModal}
                   className="px-3.5 py-2 rounded-sm border border-zinc-300 bg-zinc-50 hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
                 >
                   キャンセル

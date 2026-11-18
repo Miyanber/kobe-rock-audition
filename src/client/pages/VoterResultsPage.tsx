@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Award, Calendar, RefreshCw } from 'lucide-react';
+import { Award, Calendar, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
+import type { AuditionScopedRoute } from '../routes.ts';
 import type { AuditionDto, VoterResultsResponse } from '../types.ts';
 import type { AggregationMethod } from '../../shared/schema/index.ts';
+
+interface VoterResultsPageProps {
+  audition: AuditionDto;
+  closedAuditions: AuditionDto[];
+  onNavigateToAudition: (auditionId: string, route: AuditionScopedRoute) => void;
+}
 
 function getAggregationMethodLabel(
   method: AggregationMethod,
@@ -19,40 +26,16 @@ function getAggregationMethodLabel(
   }
 }
 
-export function VoterResultsPage() {
-  const [closedAuditions, setClosedAuditions] = useState<AuditionDto[]>([]);
-  const [selectedAuditionId, setSelectedAuditionId] = useState('');
+export function VoterResultsPage({
+  audition,
+  closedAuditions,
+  onNavigateToAudition,
+}: VoterResultsPageProps) {
   const [results, setResults] = useState<VoterResultsResponse | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
   const [loadingResults, setLoadingResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadClosedAuditions = useCallback(async () => {
-    setLoadingList(true);
-    setError(null);
-    try {
-      const res = await apiJson<{ auditions: AuditionDto[] }>(
-        '/api/auditions/closed',
-      );
-      setClosedAuditions(res.auditions);
-      if (res.auditions.length > 0) {
-        setSelectedAuditionId((prev) =>
-          prev && res.auditions.some((a) => a.id === prev)
-            ? prev
-            : res.auditions[0].id,
-        );
-      } else {
-        setSelectedAuditionId('');
-        setResults(null);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'オーディション一覧の取得に失敗しました',
-      );
-    } finally {
-      setLoadingList(false);
-    }
-  }, []);
+  const isClosed = audition.status === 'CLOSED';
 
   const loadResults = useCallback(async (auditionId: string) => {
     if (!auditionId) return;
@@ -60,7 +43,7 @@ export function VoterResultsPage() {
     setError(null);
     try {
       const res = await apiJson<VoterResultsResponse>(
-        `/api/auditions/${auditionId}/results`,
+        `/api/auditions/${encodeURIComponent(auditionId)}/results`,
       );
       setResults(res);
     } catch (err) {
@@ -71,19 +54,52 @@ export function VoterResultsPage() {
   }, []);
 
   useEffect(() => {
-    void loadClosedAuditions();
-  }, [loadClosedAuditions]);
-
-  useEffect(() => {
-    if (selectedAuditionId) {
-      void loadResults(selectedAuditionId);
+    if (isClosed) {
+      void loadResults(audition.id);
+    } else {
+      setResults(null);
+      setError(null);
     }
-  }, [selectedAuditionId, loadResults]);
+  }, [audition.id, isClosed, loadResults]);
 
-  if (loadingList) {
+  if (!isClosed) {
+    const latestClosed = closedAuditions[0] ?? null;
     return (
-      <div className="py-16 text-center text-sm text-zinc-500">
-        集計結果を読み込み中...
+      <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-4">
+        <div className="mx-auto h-12 w-12 rounded-sm bg-zinc-100 flex items-center justify-center">
+          <Award className="h-6 w-6 text-zinc-500" />
+        </div>
+        <div className="flex items-center justify-center">
+          <StatusBadge status={audition.status} />
+        </div>
+        <h2 className="text-lg font-bold text-zinc-800">
+          「{audition.title}」の集計結果はまだ公開されていません
+        </h2>
+        <p className="text-sm text-zinc-600 leading-relaxed">
+          オーディションのステータスが「採点終了・集計」に切り替わると、
+          こちらから確定した順位と集計結果を閲覧できます。
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+          {audition.status === 'ACTIVE' && (
+            <button
+              type="button"
+              onClick={() => onNavigateToAudition(audition.id, 'scoring')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition cursor-pointer"
+            >
+              採点画面へ戻る
+            </button>
+          )}
+          {latestClosed && (
+            <button
+              type="button"
+              onClick={() => onNavigateToAudition(latestClosed.id, 'results')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm transition cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              公開済みの「{latestClosed.title}」の結果を見る
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -94,11 +110,7 @@ export function VoterResultsPage() {
         <p className="text-sm font-medium text-rose-800">{error}</p>
         <button
           type="button"
-          onClick={() =>
-            selectedAuditionId
-              ? void loadResults(selectedAuditionId)
-              : void loadClosedAuditions()
-          }
+          onClick={() => void loadResults(audition.id)}
           className="px-4 py-2 rounded-sm bg-rose-700 text-white text-sm font-medium cursor-pointer"
         >
           再読み込み
@@ -107,32 +119,12 @@ export function VoterResultsPage() {
     );
   }
 
-  if (closedAuditions.length === 0) {
-    return (
-      <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center space-y-3">
-        <div className="mx-auto h-12 w-12 rounded-sm bg-zinc-100 flex items-center justify-center">
-          <Award className="h-6 w-6 text-zinc-500" />
-        </div>
-        <h2 className="text-lg font-bold text-zinc-800">
-          公開中の集計結果はありません
-        </h2>
-        <p className="text-sm text-zinc-600 leading-relaxed">
-          オーディションのステータスが「採点終了・集計」に切り替わると、
-          こちらから確定した順位と集計結果を閲覧できます。
-        </p>
-      </div>
-    );
-  }
-
-  const currentAudition =
-    results?.audition ??
-    closedAuditions.find((a) => a.id === selectedAuditionId) ??
-    closedAuditions[0];
+  const currentAudition = results?.audition ?? audition;
   const rankings = results?.rankings ?? [];
 
   return (
     <div className="space-y-5">
-      {/* 対象オーディション選択ヘッダー */}
+      {/* 集計方式・更新ヘッダー */}
       <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -160,22 +152,10 @@ export function VoterResultsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <select
-            value={selectedAuditionId}
-            onChange={(e) => setSelectedAuditionId(e.target.value)}
-            aria-label="閲覧するオーディションを選択"
-            className="w-full sm:w-auto min-w-0 rounded-sm border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 focus:border-slate-600 focus:outline-none"
-          >
-            {closedAuditions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.title} ({a.eventDate})
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => void loadResults(selectedAuditionId)}
+            onClick={() => void loadResults(audition.id)}
             disabled={loadingResults}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-300 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >

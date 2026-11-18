@@ -1,23 +1,27 @@
 import type { ReactNode } from 'react';
 import { Award, LogOut, Shield } from 'lucide-react';
 import type { AuthUserDto } from '../types.ts';
-import { NAV_ITEMS, type AppRoute } from '../routes.ts';
+import { getPathForRoute, NAV_ITEMS, type AppRoute } from '../routes.ts';
 
 export type { AppRoute } from '../routes.ts';
 
 interface LayoutProps {
   user: AuthUserDto;
   activeRoute: AppRoute;
+  currentAuditionId: string | null;
   onNavigate: (route: AppRoute) => void;
   onLogout: () => void;
+  subHeader?: ReactNode;
   children: ReactNode;
 }
 
 export function Layout({
   user,
   activeRoute,
+  currentAuditionId,
   onNavigate,
   onLogout,
+  subHeader,
   children,
 }: LayoutProps) {
   const isAdmin = user.role === 'ADMIN';
@@ -74,33 +78,43 @@ export function Layout({
             {visibleNav.map((item) => {
               const Icon = item.icon;
               const active = activeRoute === item.id;
+              const href = getPathForRoute(item.id, currentAuditionId);
+              const isGlobalTab = item.id === 'admin-users';
               return (
-                <a
+                <div
                   key={item.id}
-                  href={item.path}
-                  aria-current={active ? 'page' : undefined}
-                  onClick={(e) => {
-                    if (
-                      e.metaKey ||
-                      e.ctrlKey ||
-                      e.shiftKey ||
-                      e.altKey ||
-                      e.button !== 0
-                    ) {
-                      return;
-                    }
-                    e.preventDefault();
-                    onNavigate(item.id);
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${
-                    active
-                      ? 'bg-slate-600 text-white'
-                      : 'text-zinc-300 hover:text-white hover:bg-slate-600/60'
-                  }`}
+                  className={
+                    isGlobalTab
+                      ? 'flex items-center pl-2 ml-1 border-l border-slate-500/60 shrink-0'
+                      : 'shrink-0'
+                  }
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </a>
+                  <a
+                    href={href}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={(e) => {
+                      if (
+                        e.metaKey ||
+                        e.ctrlKey ||
+                        e.shiftKey ||
+                        e.altKey ||
+                        e.button !== 0
+                      ) {
+                        return;
+                      }
+                      e.preventDefault();
+                      onNavigate(item.id);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs sm:text-sm font-medium whitespace-nowrap transition cursor-pointer ${
+                      active
+                        ? 'bg-slate-600 text-white'
+                        : 'text-zinc-300 hover:text-white hover:bg-slate-600/60'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </a>
+                </div>
               );
             })}
           </nav>
@@ -108,9 +122,9 @@ export function Layout({
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-5">
+        {subHeader}
         {children}
       </main>
     </div>
   );
 }
-

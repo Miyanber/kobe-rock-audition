@@ -21,9 +21,97 @@ import {
   UpsertScoreSchema,
 } from '../../shared/schema/index.ts';
 import { calculateGrade } from '../../shared/grade.ts';
+import type { AppDb } from '../db/client.ts';
+
+async function loadAuditionHighlights(db: AppDb) {
+  const [activeAudition] = await db
+    .select()
+    .from(auditions)
+    .where(eq(auditions.status, 'ACTIVE'))
+    .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+    .limit(1);
+
+  const [draftAudition] = await db
+    .select()
+    .from(auditions)
+    .where(eq(auditions.status, 'DRAFT'))
+    .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+    .limit(1);
+
+  const [preparingAudition] = await db
+    .select()
+    .from(auditions)
+    .where(inArray(auditions.status, ['DRAFT', 'ENTRY_CLOSED']))
+    .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+    .limit(1);
+
+  const [latestClosedAudition] = await db
+    .select()
+    .from(auditions)
+    .where(eq(auditions.status, 'CLOSED'))
+    .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
+    .limit(1);
+
+  return {
+    activeAudition: activeAudition ?? null,
+    draftAudition: draftAudition ?? null,
+    preparingAudition: preparingAudition ?? null,
+    latestClosedAudition: latestClosedAudition ?? null,
+  };
+}
+
+async function loadUserScoringContext(db: AppDb, userId: string, auditionId: string) {
+  const [voterEntry] = await db
+    .select()
+    .from(auditionVoters)
+    .where(
+      and(
+        eq(auditionVoters.auditionId, auditionId),
+        eq(auditionVoters.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  const bandsWithMembers = await loadBandsWithMembers(db, auditionId);
+  const ownBandIds = bandsWithMembers
+    .filter((b) => b.members.some((m) => m.userId === userId))
+    .map((b) => b.id);
+
+  const myScores = await db
+    .select({
+      id: scores.id,
+      bandId: scores.bandId,
+      techScore: scores.techScore,
+      charmScore: scores.charmScore,
+      comment: scores.comment,
+      updatedAt: scores.updatedAt,
+    })
+    .from(scores)
+    .where(
+      and(
+        eq(scores.auditionId, auditionId),
+        eq(scores.evaluatorUserId, userId),
+      ),
+    );
+
+  return {
+    voterEntry: voterEntry ?? null,
+    bands: bandsWithMembers,
+    ownBandIds,
+    myScores,
+  };
+}
 
 export const auditionRoutes = new Hono<AppEnv>()
   .use('*', requireAuth)
+  .get('/', async (c) => {
+    const db = c.get('db');
+    const list = await db
+      .select()
+      .from(auditions)
+      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt));
+    return c.json({ auditions: list });
+  })
   .get('/users/selectable', async (c) => {
     const db = c.get('db');
     const rows = await db
@@ -46,41 +134,11 @@ export const auditionRoutes = new Hono<AppEnv>()
   .get('/current', async (c) => {
     const db = c.get('db');
     const user = c.get('user')!;
+    const highlights = await loadAuditionHighlights(db);
 
-    const [activeAudition] = await db
-      .select()
-      .from(auditions)
-      .where(eq(auditions.status, 'ACTIVE'))
-      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
-      .limit(1);
-
-    const [draftAudition] = await db
-      .select()
-      .from(auditions)
-      .where(eq(auditions.status, 'DRAFT'))
-      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
-      .limit(1);
-
-    const [preparingAudition] = await db
-      .select()
-      .from(auditions)
-      .where(inArray(auditions.status, ['DRAFT', 'ENTRY_CLOSED']))
-      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
-      .limit(1);
-
-    const [latestClosedAudition] = await db
-      .select()
-      .from(auditions)
-      .where(eq(auditions.status, 'CLOSED'))
-      .orderBy(desc(auditions.eventDate), desc(auditions.createdAt))
-      .limit(1);
-
-    if (!activeAudition) {
+    if (!highlights.activeAudition) {
       return c.json({
-        activeAudition: null,
-        draftAudition: draftAudition ?? null,
-        preparingAudition: preparingAudition ?? null,
-        latestClosedAudition: latestClosedAudition ?? null,
+        ...highlights,
         voterEntry: null,
         bands: [],
         ownBandIds: [],
@@ -88,48 +146,15 @@ export const auditionRoutes = new Hono<AppEnv>()
       });
     }
 
-    const [voterEntry] = await db
-      .select()
-      .from(auditionVoters)
-      .where(
-        and(
-          eq(auditionVoters.auditionId, activeAudition.id),
-          eq(auditionVoters.userId, user.id),
-        ),
-      )
-      .limit(1);
-
-    const bandsWithMembers = await loadBandsWithMembers(db, activeAudition.id);
-    const ownBandIds = bandsWithMembers
-      .filter((b) => b.members.some((m) => m.userId === user.id))
-      .map((b) => b.id);
-
-    const myScores = await db
-      .select({
-        id: scores.id,
-        bandId: scores.bandId,
-        techScore: scores.techScore,
-        charmScore: scores.charmScore,
-        comment: scores.comment,
-        updatedAt: scores.updatedAt,
-      })
-      .from(scores)
-      .where(
-        and(
-          eq(scores.auditionId, activeAudition.id),
-          eq(scores.evaluatorUserId, user.id),
-        ),
-      );
+    const scoringCtx = await loadUserScoringContext(
+      db,
+      user.id,
+      highlights.activeAudition.id,
+    );
 
     return c.json({
-      activeAudition,
-      draftAudition: draftAudition ?? null,
-      preparingAudition: preparingAudition ?? null,
-      latestClosedAudition: latestClosedAudition ?? null,
-      voterEntry: voterEntry ?? null,
-      bands: bandsWithMembers,
-      ownBandIds,
-      myScores,
+      ...highlights,
+      ...scoringCtx,
     });
   })
   .get('/drafts', async (c) => {
@@ -149,6 +174,42 @@ export const auditionRoutes = new Hono<AppEnv>()
       .where(eq(auditions.status, 'CLOSED'))
       .orderBy(desc(auditions.eventDate), desc(auditions.createdAt));
     return c.json({ auditions: closedAuditions });
+  })
+  .get('/:id/scoring', async (c) => {
+    const db = c.get('db');
+    const user = c.get('user')!;
+    const auditionId = c.req.param('id');
+
+    const [audition] = await db
+      .select()
+      .from(auditions)
+      .where(eq(auditions.id, auditionId))
+      .limit(1);
+
+    if (!audition) {
+      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    }
+
+    const highlights = await loadAuditionHighlights(db);
+
+    if (audition.status !== 'ACTIVE') {
+      return c.json({
+        audition,
+        ...highlights,
+        voterEntry: null,
+        bands: [],
+        ownBandIds: [],
+        myScores: [],
+      });
+    }
+
+    const scoringCtx = await loadUserScoringContext(db, user.id, audition.id);
+
+    return c.json({
+      audition,
+      ...highlights,
+      ...scoringCtx,
+    });
   })
   .get('/:id/results', async (c) => {
     const db = c.get('db');

@@ -33,6 +33,35 @@ import {
   type Role,
 } from '../../shared/schema/index.ts';
 import { calculateGrade, getAcademicYear } from '../../shared/grade.ts';
+import type { AppDb } from '../db/client.ts';
+
+const SHORT_ID_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+const SHORT_ID_LENGTH = 8;
+
+function createRandomShortId(): string {
+  const bytes = new Uint8Array(SHORT_ID_LENGTH);
+  globalThis.crypto.getRandomValues(bytes);
+  let id = '';
+  for (let i = 0; i < SHORT_ID_LENGTH; i++) {
+    id += SHORT_ID_ALPHABET[bytes[i] % SHORT_ID_ALPHABET.length];
+  }
+  return id;
+}
+
+async function generateUniqueAuditionId(db: AppDb): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = createRandomShortId();
+    const [existing] = await db
+      .select({ id: auditions.id })
+      .from(auditions)
+      .where(eq(auditions.id, candidate))
+      .limit(1);
+    if (!existing) {
+      return candidate;
+    }
+  }
+  return crypto.randomUUID();
+}
 
 export const adminRoutes = new Hono<AppEnv>()
   .use('*', requireAdmin)
@@ -48,7 +77,7 @@ export const adminRoutes = new Hono<AppEnv>()
     const db = c.get('db');
     const body = c.req.valid('json');
     const now = Date.now();
-    const id = crypto.randomUUID();
+    const id = await generateUniqueAuditionId(db);
 
     await db.insert(auditions).values({
       id,

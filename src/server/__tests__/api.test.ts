@@ -632,5 +632,90 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     };
     expect(getBandsData.bands.map((b) => b.id)).toEqual(newOrderIds);
   });
+
+  it('一般部員向けオーディション一覧と指定オーディション別採点コンテキスト取得APIが正しく動作する', async () => {
+    const unauthRes = await app.request('/api/auditions');
+    expect(unauthRes.status).toBe(401);
+
+    const multiCookie = await loginAs('u-multi');
+
+    const listRes = await app.request('/api/auditions', {
+      headers: { Cookie: multiCookie },
+    });
+    expect(listRes.status).toBe(200);
+    const listData = (await listRes.json()) as {
+      auditions: Array<{ id: string; status: string; eventDate: string }>;
+    };
+    expect(listData.auditions.length).toBeGreaterThanOrEqual(2);
+    // 開催日降順になっていること
+    for (let i = 1; i < listData.auditions.length; i++) {
+      expect(
+        listData.auditions[i - 1].eventDate >= listData.auditions[i].eventDate,
+      ).toBe(true);
+    }
+
+    // ACTIVE な aud-2026-winter の採点コンテキスト取得
+    const activeRes = await app.request(
+      '/api/auditions/aud-2026-winter/scoring',
+      { headers: { Cookie: multiCookie } },
+    );
+    expect(activeRes.status).toBe(200);
+    const activeData = (await activeRes.json()) as {
+      audition: { id: string; status: string };
+      voterEntry: { userId: string } | null;
+      bands: Array<{ id: string }>;
+      ownBandIds: string[];
+    };
+    expect(activeData.audition.id).toBe('aud-2026-winter');
+    expect(activeData.audition.status).toBe('ACTIVE');
+    expect(activeData.voterEntry?.userId).toBe('u-multi');
+    expect(activeData.bands.length).toBeGreaterThan(0);
+    expect(activeData.ownBandIds).toContain('b-win-1');
+
+    // DRAFT な aud-2027-spring は採点不可状態 + activeAudition 案内を返す
+    const draftRes = await app.request(
+      '/api/auditions/aud-2027-spring/scoring',
+      { headers: { Cookie: multiCookie } },
+    );
+    expect(draftRes.status).toBe(200);
+    const draftData = (await draftRes.json()) as {
+      audition: { id: string; status: string };
+      activeAudition: { id: string } | null;
+      voterEntry: null;
+      bands: unknown[];
+    };
+    expect(draftData.audition.id).toBe('aud-2027-spring');
+    expect(draftData.audition.status).toBe('DRAFT');
+    expect(draftData.activeAudition?.id).toBe('aud-2026-winter');
+    expect(draftData.voterEntry).toBeNull();
+    expect(draftData.bands).toEqual([]);
+
+    // 存在しないIDは 404
+    const notFoundRes = await app.request(
+      '/api/auditions/aud-not-found/scoring',
+      { headers: { Cookie: multiCookie } },
+    );
+    expect(notFoundRes.status).toBe(404);
+  });
+
+  it('新規オーディション作成時に短い英数字8文字のIDが生成される', async () => {
+    const adminCookie = await loginAs('u-admin');
+    const createRes = await app.request('/api/admin/auditions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        title: '2027 新歓ライブ',
+        eventDate: '2027-04-20',
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const data = (await createRes.json()) as {
+      audition: { id: string; title: string };
+    };
+    expect(data.audition.id).toMatch(/^[a-hj-km-np-z2-9]{8}$/);
+  });
 });
 

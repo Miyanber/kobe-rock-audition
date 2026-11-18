@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Shield, Trash2, Upload, UserCheck, Users } from 'lucide-react';
+import { ArrowLeft, Shield, Trash2, Upload, UserCheck, Users } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
-import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
 import { ToastNotification } from '../components/ToastNotification.tsx';
 import type { AuditionDto, AuthUserDto, SelectableUserDto } from '../types.ts';
 import type { Role } from '../../shared/schema/index.ts';
 
 interface AdminUsersPageProps {
   currentUser: AuthUserDto;
-  auditions: AuditionDto[];
-  selectedAuditionId: string;
-  onSelectAudition: (id: string) => void;
+  returnAudition?: AuditionDto | null;
+  onReturnToAudition?: () => void;
   onCurrentUserChanged: () => Promise<void>;
 }
 
@@ -19,9 +17,8 @@ const SAMPLE_USERS_CSV = `山田 音子,otoko@stu.kobe-u.ac.jp,2026,VOTER
 
 export function AdminUsersPage({
   currentUser,
-  auditions,
-  selectedAuditionId,
-  onSelectAudition,
+  returnAudition,
+  onReturnToAudition,
   onCurrentUserChanged,
 }: AdminUsersPageProps) {
   const [usersList, setUsersList] = useState<
@@ -133,11 +130,32 @@ export function AdminUsersPage({
 
   return (
     <div className="space-y-5">
-      <AdminAuditionHeader
-        auditions={auditions}
-        selectedAuditionId={selectedAuditionId}
-        onSelectAudition={onSelectAudition}
-      />
+      <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
+              全オーディション共通設定
+            </span>
+          </div>
+          <h1 className="text-base sm:text-lg font-bold text-zinc-800 mt-1">
+            部員マスタ・権限管理
+          </h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            ここで登録・編集した部員データとロール（ADMIN / VOTER）はすべてのオーディションに共通して適用されます。
+          </p>
+        </div>
+
+        {returnAudition && onReturnToAudition && (
+          <button
+            type="button"
+            onClick={onReturnToAudition}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-300 text-xs sm:text-sm font-semibold transition cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>「{returnAudition.title}」へ戻る</span>
+          </button>
+        )}
+      </div>
 
       <ToastNotification
         message={

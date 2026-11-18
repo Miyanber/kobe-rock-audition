@@ -16,19 +16,16 @@ import type {
   AuditionDto,
   AuthUserDto,
   BandWithMembersDto,
-  CurrentAuditionPayload,
   SelectableUserDto,
 } from '../types.ts';
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
-import { getAuditionStatusLabel } from '../../shared/audition-status.ts';
 
 interface WikiBandsPageProps {
   user: AuthUserDto;
+  auditionId: string;
 }
 
-export function WikiBandsPage({ user }: WikiBandsPageProps) {
-  const [auditionOptions, setAuditionOptions] = useState<AuditionDto[]>([]);
-  const [selectedAuditionId, setSelectedAuditionId] = useState<string>('');
+export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
   const [audition, setAudition] = useState<AuditionDto | null>(null);
   const [bands, setBands] = useState<BandWithMembersDto[]>([]);
   const [ownBandIds, setOwnBandIds] = useState<string[]>([]);
@@ -47,52 +44,30 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
   const [memberSearch, setMemberSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const loadAuditionChoices = useCallback(async () => {
-    setLoading(true);
+  const loadSelectableUsers = useCallback(async () => {
     try {
-      const [currentRes, draftsRes, usersRes] = await Promise.all([
-        apiJson<CurrentAuditionPayload>('/api/auditions/current'),
-        apiJson<{ auditions: AuditionDto[] }>('/api/auditions/drafts'),
-        apiJson<{ users: SelectableUserDto[] }>('/api/auditions/users/selectable'),
-      ]);
-
-      setAllUsers(usersRes.users);
-
-      const map = new Map<string, AuditionDto>();
-      for (const d of draftsRes.auditions) map.set(d.id, d);
-      if (currentRes.activeAudition) {
-        map.set(currentRes.activeAudition.id, currentRes.activeAudition);
-      }
-
-      const list = Array.from(map.values()).sort((a, b) =>
-        b.eventDate.localeCompare(a.eventDate),
+      const usersRes = await apiJson<{ users: SelectableUserDto[] }>(
+        '/api/auditions/users/selectable',
       );
-      setAuditionOptions(list);
-
-      // DRAFT があればそれを優先選択
-      const defaultTarget = draftsRes.auditions[0] ?? currentRes.activeAudition ?? list[0];
-      if (defaultTarget) {
-        setSelectedAuditionId((prev) => (prev && map.has(prev) ? prev : defaultTarget.id));
-      }
-    } catch (err) {
-      setMessage({
-        type: 'err',
-        text: err instanceof Error ? err.message : 'データ取得に失敗しました',
-      });
-    } finally {
-      setLoading(false);
+      setAllUsers(usersRes.users);
+    } catch {
+      // ignore
     }
   }, []);
 
   const loadBandsForAudition = useCallback(async (audId: string) => {
-    if (!audId) return;
+    if (!audId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const res = await apiJson<{
         audition: AuditionDto;
         bands: BandWithMembersDto[];
         ownBandIds: string[];
         canEditWiki: boolean;
-      }>(`/api/auditions/${audId}/bands`);
+      }>(`/api/auditions/${encodeURIComponent(audId)}/bands`);
       setAudition(res.audition);
       setBands(res.bands);
       setOwnBandIds(res.ownBandIds);
@@ -102,18 +77,18 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
         type: 'err',
         text: err instanceof Error ? err.message : 'バンド情報の取得に失敗しました',
       });
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadAuditionChoices();
-  }, [loadAuditionChoices]);
+    void loadSelectableUsers();
+  }, [loadSelectableUsers]);
 
   useEffect(() => {
-    if (selectedAuditionId) {
-      void loadBandsForAudition(selectedAuditionId);
-    }
-  }, [selectedAuditionId, loadBandsForAudition]);
+    void loadBandsForAudition(auditionId);
+  }, [auditionId, loadBandsForAudition]);
 
   const filteredUsers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
@@ -206,14 +181,14 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
     return <div className="py-16 text-center text-sm text-zinc-500">読み込み中...</div>;
   }
 
-  if (auditionOptions.length === 0) {
+  if (!audition) {
     return (
       <div className="max-w-2xl mx-auto bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center">
         <p className="font-bold text-zinc-800">
-          表示可能なオーディションがまだありません
+          オーディション情報の読み込みに失敗しました
         </p>
         <p className="text-xs text-zinc-500 mt-1">
-          運営委員が新しいオーディションを作成すると、ここに出演バンド登録画面が表示されます。
+          {message?.text ?? '指定されたオーディションが見つからないか、表示できません。'}
         </p>
       </div>
     );
@@ -233,55 +208,43 @@ export function WikiBandsPage({ user }: WikiBandsPageProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={selectedAuditionId}
-              onChange={(e) => setSelectedAuditionId(e.target.value)}
-              className="w-full sm:w-auto min-w-0 rounded-sm border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800"
+          {canEditWiki && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold transition cursor-pointer shrink-0 self-start sm:self-auto"
             >
-              {auditionOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  [{opt.eventDate}] {opt.title} ({getAuditionStatusLabel(opt.status)})
-                </option>
-              ))}
-            </select>
-
-            {canEditWiki && (
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold transition cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                バンドを登録
-              </button>
-            )}
-          </div>
+              <Plus className="h-4 w-4" />
+              バンドを登録
+            </button>
+          )}
         </div>
 
-        {audition && (
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-300 flex-wrap">
-            <div className="flex items-center gap-2">
-              <StatusBadge status={audition.status} />
-              <span className="text-xs text-zinc-500">
-                登録バンド数: <strong className="text-zinc-800">{bands.length}</strong> 組
-              </span>
-            </div>
-
-            {audition.status !== 'DRAFT' && (
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-sm">
-                <Lock className="h-3.5 w-3.5" />
-                {audition.status === 'ENTRY_CLOSED'
-                  ? user.role === 'ADMIN'
-                    ? '募集締切・調整中（一般部員ロック中・運営権限で編集可）'
-                    : 'バンド募集は締め切られました（閲覧専用・運営が出演順等を調整中）'
-                  : user.role === 'ADMIN'
-                    ? '採点受付中（一般部員ロック中・運営権限で編集可）'
-                    : '採点受付中のため閲覧専用です（編集ロック）'}
-              </div>
-            )}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-300 flex-wrap">
+          <div className="flex items-center gap-2">
+            <StatusBadge status={audition.status} />
+            <span className="text-xs text-zinc-500">
+              登録バンド数: <strong className="text-zinc-800">{bands.length}</strong> 組
+            </span>
           </div>
-        )}
+
+          {audition.status !== 'DRAFT' && (
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-sm">
+              <Lock className="h-3.5 w-3.5" />
+              {audition.status === 'ENTRY_CLOSED'
+                ? user.role === 'ADMIN'
+                  ? '募集締切・調整中（一般部員ロック中・運営権限で編集可）'
+                  : 'バンド募集は締め切られました（閲覧専用・運営が出演順等を調整中）'
+                : audition.status === 'ACTIVE'
+                  ? user.role === 'ADMIN'
+                    ? '採点受付中（一般部員ロック中・運営権限で編集可）'
+                    : '採点受付中のため閲覧専用です（編集ロック）'
+                  : user.role === 'ADMIN'
+                    ? '採点終了・集計済み（一般部員ロック中・運営権限で編集可）'
+                    : '採点終了・集計済みのため閲覧専用です（編集ロック）'}
+            </div>
+          )}
+        </div>
       </div>
 
       <ToastNotification

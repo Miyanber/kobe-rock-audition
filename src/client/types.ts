@@ -86,6 +86,10 @@ export interface CurrentAuditionPayload {
   myScores: MyScoreDto[];
 }
 
+export interface AuditionScoringPayload extends CurrentAuditionPayload {
+  audition: AuditionDto;
+}
+
 export interface VoterBandRankingDto {
   rank: number;
   isTied: boolean;

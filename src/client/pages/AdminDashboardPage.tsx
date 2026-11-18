@@ -8,7 +8,6 @@ import {
   Sliders,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
-import { AdminAuditionHeader } from '../components/AdminAuditionHeader.tsx';
 import { ToastNotification } from '../components/ToastNotification.tsx';
 import type {
   AdminResultsResponse,
@@ -20,14 +19,12 @@ import type { AggregationMethod } from '../../shared/schema/index.ts';
 interface AdminDashboardPageProps {
   auditions: AuditionDto[];
   selectedAuditionId: string;
-  onSelectAudition: (id: string) => void;
   onAuditionsChanged: () => Promise<void>;
 }
 
 export function AdminDashboardPage({
   auditions,
   selectedAuditionId,
-  onSelectAudition,
   onAuditionsChanged,
 }: AdminDashboardPageProps) {
   const [results, setResults] = useState<AdminResultsResponse | null>(null);
@@ -137,12 +134,6 @@ export function AdminDashboardPage({
 
   return (
     <div className="space-y-5">
-      <AdminAuditionHeader
-        auditions={auditions}
-        selectedAuditionId={selectedAuditionId}
-        onSelectAudition={onSelectAudition}
-      />
-
       <ToastNotification
         message={statusMsg ? { text: statusMsg, type: 'success' } : null}
         onClose={() => setStatusMsg(null)}
