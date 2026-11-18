@@ -27,7 +27,6 @@ export interface LoadedBandWithMembers {
   members: Array<{
     userId: string;
     name: string;
-    email: string;
     enrollmentYear: number;
     grade: number;
     instrument: string | null;
@@ -63,7 +62,6 @@ export async function loadBandsWithMembers(
       userId: bandMembers.userId,
       instrument: bandMembers.instrument,
       name: users.name,
-      email: users.email,
       enrollmentYear: users.enrollmentYear,
     })
     .from(bandMembers)
@@ -78,7 +76,6 @@ export async function loadBandsWithMembers(
     list.push({
       userId: row.userId,
       name: row.name,
-      email: row.email,
       enrollmentYear: row.enrollmentYear,
       grade: calculateGrade(row.enrollmentYear),
       instrument: row.instrument,

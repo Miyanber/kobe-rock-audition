@@ -316,7 +316,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       email: 'admin@stu.kobe-u.ac.jp',
       name: '神戸 太郎 (運営委員長)',
       role: 'ADMIN',
-      enrollmentYear: 2023,
+      enrollmentYear: 2024,
       createdAt: now,
       updatedAt: now,
     },
@@ -383,7 +383,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     if (!fullName) fullName = `部員 ${String(i).padStart(3, '0')}`;
 
     const year =
-      i <= 21 ? 2023 : i <= 51 ? 2024 : i <= 85 ? 2025 : 2026;
+      i <= 35 ? 2024 : i <= 75 ? 2025 : 2026;
     const prefix = String(year).slice(-2);
     const role: 'ADMIN' | 'VOTER' = i === 1 || i === 22 ? 'ADMIN' : 'VOTER';
 
@@ -402,7 +402,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   const auditionList: NewAudition[] = [
     {
       id: 'aud-2027-spring',
-      title: '2027 新歓ライブオーディション',
+      title: '新歓ライブ',
       eventDate: '2027-04-15',
       deadline: '2027-04-10T23:59',
       status: 'DRAFT',
@@ -414,7 +414,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'aud-2026-winter',
-      title: '六甲祭2026',
+      title: '六甲祭',
       eventDate: '2026-12-20',
       deadline: '2026-12-15T23:59',
       status: 'ACTIVE',
@@ -426,7 +426,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'aud-2026-summer',
-      title: '2026 夏ライブオーディション',
+      title: '夏ライブ',
       eventDate: '2026-08-10',
       deadline: '2026-08-05T23:59',
       status: 'CLOSED',
@@ -466,6 +466,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   WINTER_BANDS.forEach((b, idx) => {
     const bandId = `b-win-${idx + 1}`;
     const updater = userList[idx % 20].id;
+    const bandTime = now - (WINTER_BANDS.length - idx) * 60_000;
     bandList.push({
       id: bandId,
       auditionId: 'aud-2026-winter',
@@ -473,8 +474,8 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       performanceOrder: idx + 1,
       penaltyDeduction: b.penalty,
       updatedByUserId: updater,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: bandTime,
+      updatedAt: bandTime,
     });
   });
 
@@ -554,6 +555,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   // 3b. Summer bands (24 bands)
   SUMMER_BANDS.forEach((b, idx) => {
     const bandId = `b-sum-${idx + 1}`;
+    const bandTime = now - (SUMMER_BANDS.length - idx) * 60_000;
     bandList.push({
       id: bandId,
       auditionId: 'aud-2026-summer',
@@ -561,8 +563,8 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       performanceOrder: idx + 1,
       penaltyDeduction: b.penalty,
       updatedByUserId: 'u-admin',
-      createdAt: now,
-      updatedAt: now,
+      createdAt: bandTime,
+      updatedAt: bandTime,
     });
   });
 
@@ -588,6 +590,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   // 3c. Spring DRAFT bands (8 bands)
   SPRING_DRAFT_BANDS.forEach((name, idx) => {
     const bandId = `b-spr-${idx + 1}`;
+    const bandTime = now - (SPRING_DRAFT_BANDS.length - idx) * 60_000;
     bandList.push({
       id: bandId,
       auditionId: 'aud-2027-spring',
@@ -595,8 +598,8 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       performanceOrder: idx + 1,
       penaltyDeduction: 0,
       updatedByUserId: idx === 0 ? 'u-voter1' : userList[(idx * 3) % 30].id,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: bandTime,
+      updatedAt: bandTime,
     });
   });
 

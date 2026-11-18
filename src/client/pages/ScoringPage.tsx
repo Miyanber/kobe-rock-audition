@@ -178,7 +178,7 @@ export function ScoringPage({
     if (!activeAudition) return;
     const trimmed = generalFeedbackDraft.text.trim();
     if (!trimmed) {
-      showToast('error', '全体講評（総括）を入力してください');
+      showToast('error', '全体講評を入力してください');
       return;
     }
 
@@ -197,7 +197,7 @@ export function ScoringPage({
         body: JSON.stringify({ generalFeedback: trimmed }),
       });
       markGeneralFeedbackSaved();
-      showToast('success', '全体講評（総括）を保存しました');
+      showToast('success', '全体講評を保存しました');
     } catch (err) {
       showToast(
         'error',
@@ -395,11 +395,10 @@ export function ScoringPage({
           採点・コメント対象者に登録されていません
         </h2>
         <p className="text-sm text-zinc-600 leading-relaxed">
-          現在開催中の「<span className="font-semibold">{activeAudition.title}</span>
-          」について、あなたのアカウント（<span className="font-mono">{user.email}</span>
-          ）には採点・コメント権限が割り当てられていません。
+          現在開催中の「<span className="font-semibold">{activeAudition.title}</span>」について、
+          現在ログイン中のアカウントには採点・コメント権限が割り当てられていません。
           <br />
-          採点参加が必要な場合は、渉外・運営委員（ADMIN）へ参加権限の付与をご依頼ください。
+          採点参加が必要な場合は、渉外・運営委員へ参加権限の付与をご依頼ください。
         </p>
       </div>
     );
@@ -416,12 +415,12 @@ export function ScoringPage({
                 採点受付中
               </span>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-                {isCommentOnly ? '権限: コメント入力のみ' : '権限: 採点＋コメント'}
+                {isCommentOnly ? 'コメント入力のみ' : '採点＋コメント必須'}
               </span>
               {voterEntry.isSubmitted ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  提出済（再編集可）
+                  提出済・再編集可
                 </span>
               ) : (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -432,10 +431,11 @@ export function ScoringPage({
             <h1 className="text-lg sm:text-xl font-bold text-zinc-800 mt-1.5">
               {activeAudition.title}
             </h1>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              開催日: {activeAudition.eventDate}
-              {activeAudition.deadline && ` / 締切: ${activeAudition.deadline.replace('T', ' ')}`}
-            </p>
+            {activeAudition.deadline && (
+              <p className="text-xs text-zinc-500 mt-0.5">
+                締切: {activeAudition.deadline.replace('T', ' ')}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -449,12 +449,12 @@ export function ScoringPage({
               {isOnline ? (
                 <>
                   <Wifi className="h-3.5 w-3.5" />
-                  オンライン（自動下書き保存中）
+                  オンライン自動保存中
                 </>
               ) : (
                 <>
                   <CloudOff className="h-3.5 w-3.5" />
-                  オフライン（端末に下書き保存中）
+                  オフライン・端末に下書き保存中
                 </>
               )}
             </span>
@@ -477,7 +477,7 @@ export function ScoringPage({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2 flex-wrap text-xs font-medium text-zinc-600">
             <span>
-              入力進捗（自バンド {ownBandSet.size} 組除外・全体講評含む）
+              入力進捗：自バンド {ownBandSet.size} 組除外・全体講評含む
             </span>
             <span className="font-bold text-zinc-800">
               バンド {completionStatus.completedBands} / {completionStatus.totalBands} ・ 全体講評{' '}
@@ -539,7 +539,7 @@ export function ScoringPage({
                   </div>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] bg-zinc-200 text-zinc-600 shrink-0">
                     <Ban className="h-3 w-3" />
-                    自バンド（対象外）
+                    自バンド・対象外
                   </span>
                 </div>
               </div>
@@ -672,7 +672,7 @@ export function ScoringPage({
                             htmlFor={`charm-${band.id}`}
                             className="text-xs font-bold text-zinc-800"
                           >
-                            魅力点 <span className="font-normal text-zinc-500">(0〜50)</span>
+                            魅力点 <span className="font-normal text-zinc-500">0〜50点</span>
                           </label>
                           <input
                             id={`charm-${band.id}`}
@@ -714,7 +714,7 @@ export function ScoringPage({
                             htmlFor={`tech-${band.id}`}
                             className="text-xs font-bold text-zinc-800"
                           >
-                            技術点 <span className="font-normal text-zinc-500">(0〜50)</span>
+                            技術点 <span className="font-normal text-zinc-500">0〜50点</span>
                           </label>
                           <input
                             id={`tech-${band.id}`}
@@ -815,7 +815,7 @@ export function ScoringPage({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h3 className="font-bold text-zinc-800 text-sm sm:text-base leading-tight">
-                    全体講評（総括）
+                    全体講評
                   </h3>
                   {generalFeedbackDraft.dirty ? (
                     <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-amber-50 text-amber-800">
@@ -1011,7 +1011,7 @@ export function ScoringPage({
 
               <div className="border border-zinc-300 bg-zinc-100/70 rounded-sm p-3 space-y-1">
                 <div className="text-xs font-bold text-zinc-800">
-                  全体講評（総括）
+                  全体講評
                 </div>
                 {generalFeedbackDraft.text.trim() ? (
                   <p className="text-xs text-zinc-700 whitespace-pre-wrap break-words">
@@ -1019,7 +1019,7 @@ export function ScoringPage({
                   </p>
                 ) : (
                   <p className="text-xs font-semibold text-rose-600">
-                    （未入力 — 最終提出には全体講評の入力が必要です）
+                    未入力 — 最終提出には全体講評の入力が必要です
                   </p>
                 )}
               </div>

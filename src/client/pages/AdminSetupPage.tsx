@@ -316,9 +316,7 @@ export function AdminSetupPage({
       }
 
       if (normalizedQuery) {
-        const matchesName = u.name.toLowerCase().includes(normalizedQuery);
-        const matchesEmail = u.email.toLowerCase().includes(normalizedQuery);
-        if (!matchesName && !matchesEmail) return false;
+        if (!u.name.toLowerCase().includes(normalizedQuery)) return false;
       }
 
       return true;
@@ -374,7 +372,7 @@ export function AdminSetupPage({
       await onAuditionsChanged();
       onSelectAudition(res.audition.id);
       showToast(
-        `新規オーディション「${res.audition.title}」を「${getAuditionStatusLabel(res.audition.status)}」で作成しました`,
+        `新規イベント「${res.audition.title}」を「${getAuditionStatusLabel(res.audition.status)}」で作成しました`,
       );
     } finally {
       setCreating(false);
@@ -742,7 +740,7 @@ export function AdminSetupPage({
               >
                 <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
                   <Play className="h-5 w-5 text-emerald-600" />
-                  進行ステータス切替（対象: {selectedAudition.title}）
+                  進行ステータス切替：{selectedAudition.title}
                 </h2>
                 <p className="text-xs text-zinc-500">
                   ① バンド募集中 → ② 募集締切・調整中 → ③ 採点受付中 → ④ 採点終了・集計 の順に進めてください
@@ -788,7 +786,7 @@ export function AdminSetupPage({
                     採点・コメント義務設定
                   </h2>
                   <span className="text-xs text-zinc-500">
-                    ※4月基準で1〜3回生のみ表示（4回生以上は自動非表示）
+                    ※4月基準で1〜3回生のみ表示
                   </span>
                 </div>
 
@@ -853,7 +851,7 @@ export function AdminSetupPage({
                 <div className="bg-zinc-100 border border-zinc-300 rounded-sm p-4 space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-bold text-zinc-700">
-                      絞り込み条件（下の表と一括操作に連動）
+                      絞り込み条件
                     </span>
                     {hasActiveVoterFilter && (
                       <button
@@ -948,7 +946,7 @@ export function AdminSetupPage({
                         htmlFor="voter-search-input"
                         className="block text-xs font-bold text-zinc-700 mb-1.5"
                       >
-                        氏名・メール検索
+                        氏名検索
                       </label>
                       <div className="relative">
                         <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -957,7 +955,7 @@ export function AdminSetupPage({
                           type="text"
                           value={voterSearchQuery}
                           onChange={(e) => setVoterSearchQuery(e.target.value)}
-                          placeholder="氏名またはメールアドレスで検索"
+                          placeholder="氏名で検索"
                           className="w-full rounded-sm border border-zinc-300 bg-white pl-8 pr-8 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
                         />
                         {voterSearchQuery && (
@@ -980,7 +978,7 @@ export function AdminSetupPage({
                       <span className="text-xs font-bold text-zinc-700">
                         表示中の {filteredUsers.length}名
                         {hasActiveVoterFilter &&
-                          `（全${visibleUsers.length}名中）`}
+                          ` / 全${visibleUsers.length}名`}
                         をまとめて変更:
                       </span>
                       <select
@@ -995,7 +993,7 @@ export function AdminSetupPage({
                       >
                         <option value="COMMENT_ONLY">コメントのみ</option>
                         <option value="SCORE_AND_COMMENT">採点＋コメント</option>
-                        <option value="REMOVE">不参加（採点・コメントなし）</option>
+                        <option value="REMOVE">不参加</option>
                       </select>
                     </div>
 
@@ -1041,9 +1039,6 @@ export function AdminSetupPage({
                           <tr key={u.id} className="hover:bg-zinc-50/70">
                             <td className="px-3 py-2.5 font-medium text-zinc-800">
                               {u.name}
-                              <div className="text-[11px] text-zinc-400 font-mono">
-                                {u.email}
-                              </div>
                             </td>
                             <td className="px-3 py-2.5 text-zinc-600 whitespace-nowrap">
                               {grade}回生
@@ -1184,10 +1179,10 @@ export function AdminSetupPage({
                   <div>
                     <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
                       <ArrowUpDown className="h-5 w-5 text-slate-700" />
-                      バンド出演順（動画順）の並び替え
+                      バンド出演順の並び替え
                     </h2>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      ↑↓ボタンまたはドラッグ＆ドロップでオーディション動画の再生順に並び替え、保存してください（1から連番で反映されます）。
+                      ↑↓ボタンまたはドラッグ＆ドロップで出演順に並び替え、保存してください。1から連番で反映されます。
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1322,7 +1317,7 @@ export function AdminSetupPage({
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
                     <Upload className="h-5 w-5 text-slate-700" />
-                    参加バンド・出演順・メンバー 一括登録（CSV / TSV）
+                    参加バンド・出演順・メンバー 一括登録
                   </h2>
                   <button
                     type="button"
@@ -1385,7 +1380,7 @@ export function AdminSetupPage({
                     詳細設定：点差補正定数（既定値 100）
                   </h2>
                   <p className="text-xs text-zinc-500">
-                    Min-Max 点差補正の換算満点（通常は 100 点満点換算の 100 固定を推奨）。過去Excel（10点満点）と比較する場合のみ 10 等に変更してください。
+                    Min-Max 点差補正の換算満点です。通常は 100 固定を推奨し、過去Excelと比較する場合のみ 10 等に変更してください。
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1409,11 +1404,11 @@ export function AdminSetupPage({
                 </div>
               </section>
 
-              {/* 危険な操作: オーディション削除 */}
+              {/* 危険な操作: イベント削除 */}
               <section className="bg-rose-50/40 border border-rose-200 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
                 <div className="space-y-0.5">
                   <h2 className="text-sm font-bold text-rose-800">
-                    オーディションの削除
+                    イベントの削除
                   </h2>
                   <p className="text-xs text-rose-700/90">
                     対象「{selectedAudition.title}」に紐づくバンド・参加権限・採点データもすべて削除されます。
@@ -1428,7 +1423,7 @@ export function AdminSetupPage({
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm text-xs font-bold border border-rose-300 bg-white hover:bg-rose-100 text-rose-700 transition cursor-pointer shrink-0"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  このオーディションを削除
+                  このイベントを削除
                 </button>
               </section>
             </div>
@@ -1452,7 +1447,7 @@ export function AdminSetupPage({
                   className="text-base font-bold text-zinc-800 flex items-center gap-2"
                 >
                   <FilePlus2 className="h-4 w-4 text-slate-700 shrink-0" />
-                  新規オーディションの作成
+                  新規イベントの作成
                 </h3>
                 <p className="text-xs text-zinc-500">
                   作成直後は「1. バンド募集中」ステータスで開始されます。
@@ -1472,7 +1467,7 @@ export function AdminSetupPage({
             <form onSubmit={handleCreateAudition} className="space-y-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-zinc-700">
-                  開催回名 <span className="text-rose-500">*</span>
+                  イベント名 <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -1480,14 +1475,17 @@ export function AdminSetupPage({
                   autoFocus
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="例: 2027 春ライブオーディション"
+                  placeholder="例: 六甲祭 / 秋イベ / NBRF"
                   className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
                 />
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  ※年は開催日をもとに自動表示されるため、年号は書かずに「六甲祭」「秋イベ」「NBRF」などイベント名のみ入力してください。
+                </p>
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-zinc-700">
-                  開催日（目安でOK） <span className="text-rose-500">*</span>
+                  開催予定日 <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -1497,7 +1495,7 @@ export function AdminSetupPage({
                   className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
                 />
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  ※作成時点で確定していない場合は目安の日付で構いません（主に開催回の並び順に使用されます）。
+                  ※年度表示とイベントの並び順に使用します。未確定の場合は目安の日付で構いません。
                 </p>
               </div>
 
@@ -1537,17 +1535,17 @@ export function AdminSetupPage({
                 className="text-base font-bold text-rose-700 flex items-center gap-2"
               >
                 <Trash2 className="h-4 w-4 shrink-0" />
-                オーディションの完全削除
+                イベントの完全削除
               </h3>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                この操作は元に戻せません。対象オーディションに紐づくバンド、参加権限、採点データもすべて完全に削除されます。
+                この操作は元に戻せません。対象イベントに紐づくバンド、参加権限、採点データもすべて完全に削除されます。
               </p>
             </div>
 
             <form onSubmit={handleDeleteAudition} className="space-y-3">
               <div className="space-y-1.5">
                 <label className="block text-xs text-zinc-700">
-                  削除を確定するには、以下のオーディション名を手入力してください：
+                  削除を確定するには、以下のイベント名を手入力してください：
                 </label>
                 <div className="rounded-sm bg-zinc-100 border border-zinc-200 px-3 py-2 text-xs font-mono font-bold text-zinc-800 break-all">
                   {selectedAudition.title}

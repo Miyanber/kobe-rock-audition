@@ -46,7 +46,6 @@ export const authRoutes = new Hono<AppEnv>()
     const allUsers = await db
       .select({
         id: users.id,
-        email: users.email,
         name: users.name,
         role: users.role,
         enrollmentYear: users.enrollmentYear,

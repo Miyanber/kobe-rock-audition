@@ -131,7 +131,7 @@ describe('クライアントルート定義', () => {
     expect(getDefaultRouteForAudition(closed)).toBe('results');
 
     expect(buildDocumentTitle('scoring', active)).toBe(
-      '[2026-11-18] now-active - 採点 | Kobe Rock Audition',
+      '[2026] now-active - 採点 | Kobe Rock Audition',
     );
     expect(buildDocumentTitle('admin-users', active)).toBe(
       '部員管理 | Kobe Rock Audition',

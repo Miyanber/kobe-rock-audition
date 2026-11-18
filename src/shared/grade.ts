@@ -11,6 +11,19 @@ export function getAcademicYear(now: Date = new Date()): number {
   return month >= 4 ? year : year - 1;
 }
 
+/**
+ * YYYY-MM-DD 形式の日付文字列から日本の大学年度（4月始まり）を算出する
+ */
+export function getAcademicYearFromDateString(dateStr: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr.trim());
+  if (!match) {
+    return getAcademicYear();
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return month >= 4 ? year : year - 1;
+}
+
 export function calculateGrade(enrollmentYear: number, now: Date = new Date()): number {
   const academicYear = getAcademicYear(now);
   return Math.max(1, academicYear - enrollmentYear + 1);

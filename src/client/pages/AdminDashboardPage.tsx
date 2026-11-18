@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   Clock,
+  Copy,
   Download,
   FileSpreadsheet,
   RefreshCw,
@@ -36,7 +37,7 @@ export function AdminDashboardPage({
   const [loading, setLoading] = useState(true);
   const [showComparison, setShowComparison] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'ranking' | 'evaluators' | 'voters' | 'generalFeedback'
+    'ranking' | 'voters' | 'generalFeedback'
   >('ranking');
   const [onlyUnsubmitted, setOnlyUnsubmitted] = useState(false);
   const [showEmptyFeedbacks, setShowEmptyFeedbacks] = useState(false);
@@ -122,6 +123,55 @@ export function AdminDashboardPage({
     return votersData.voters.filter((v) => !v.isSubmitted);
   }, [votersData, onlyUnsubmitted]);
 
+  const unsubmittedVoters = useMemo(
+    () => (votersData?.voters ?? []).filter((v) => !v.isSubmitted),
+    [votersData],
+  );
+
+  const handleCopyUnsubmittedList = async () => {
+    if (unsubmittedVoters.length === 0) return;
+
+    const byGrade = new Map<number, AdminVoterMonitorDto[]>();
+    for (const v of unsubmittedVoters) {
+      const list = byGrade.get(v.grade) ?? [];
+      list.push(v);
+      byGrade.set(v.grade, list);
+    }
+
+    const sortedGrades = Array.from(byGrade.keys()).sort((a, b) => b - a);
+    const title = audition?.title ?? '';
+    const lines: string[] = [
+      `【${title}オーディション 採点・コメント 未提出者一覧（${unsubmittedVoters.length}名）】`,
+    ];
+
+    for (const grade of sortedGrades) {
+      lines.push('');
+      lines.push(`■ ${grade}回生`);
+      const members = byGrade.get(grade) ?? [];
+      for (const m of members) {
+        const suffix =
+          m.permissionType === 'COMMENT_ONLY' ? '（コメントのみ）' : '';
+        lines.push(`・${m.name}${suffix}`);
+      }
+    }
+
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    showToast(`未提出者 ${unsubmittedVoters.length}名のリストをコピーしました`);
+  };
+
   if (auditions.length === 0) {
     return (
       <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center text-sm text-zinc-600">
@@ -132,7 +182,6 @@ export function AdminDashboardPage({
 
   const audition = results?.audition;
   const bandResults = results?.aggregation.bandResults ?? [];
-  const evaluatorStats = results?.aggregation.evaluatorStats ?? [];
   const generalFeedbacks = results?.aggregation.generalFeedbacks ?? [];
   const enteredFeedbackCount = useMemo(
     () => generalFeedbacks.filter((g) => g.generalFeedback.trim().length > 0).length,
@@ -150,139 +199,72 @@ export function AdminDashboardPage({
         onClose={() => setStatusMsg(null)}
       />
 
-      {/* 運用設定 & エクスポート操作パネル */}
+      {/* 運用設定 */}
       {audition && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* 集計設定 & ペナルティ切替 */}
-          <div className="lg:col-span-7 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
-                <Sliders className="h-4 w-4 text-slate-700" />
-                集計アルゴリズム設定
-              </h2>
-              <button
-                type="button"
-                onClick={loadDashboard}
-                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-slate-700 cursor-pointer"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                最新再集計
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  {
-                    id: 'DIFF_CORRECTION',
-                    label: `点差補正方式 (定数${audition.standardDiff})`,
-                  },
-                  { id: 'Z_SCORE', label: 'Zスコア（偏差値）方式' },
-                  { id: 'RAW_AVERAGE', label: '単純平均方式' },
-                ] as const
-              ).map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => handleUpdateSettings({ aggregationMethod: m.id })}
-                  className={`px-3 py-2 rounded-sm text-xs font-bold border transition cursor-pointer ${audition.aggregationMethod === m.id
-                    ? 'bg-slate-700 text-white border-slate-700'
-                    : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
-                    }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-300">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={audition.isPenaltyEnabled}
-                    onChange={(e) =>
-                      handleUpdateSettings({ isPenaltyEnabled: e.target.checked })
-                    }
-                    className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                  />
-                  ペナルティ減点を有効化
-                </label>
-
-                <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showComparison}
-                    onChange={(e) => setShowComparison(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                  />
-                  3方式比較列
-                </label>
-              </div>
-            </div>
+        <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
+              <Sliders className="h-4 w-4 text-slate-700" />
+              集計アルゴリズム設定
+            </h2>
+            <button
+              type="button"
+              onClick={loadDashboard}
+              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-slate-700 cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              最新再集計
+            </button>
           </div>
 
-          {/* 2ファイル Excel / CSV エクスポートパネル */}
-          <div className="lg:col-span-5 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-3">
-            <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-              Excel / CSV データエクスポート（2ファイル構成）
-            </h2>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                {
+                  id: 'DIFF_CORRECTION',
+                  label: `点差補正方式・定数${audition.standardDiff}`,
+                },
+                { id: 'Z_SCORE', label: 'Zスコア偏差値方式' },
+                { id: 'RAW_AVERAGE', label: '単純平均方式' },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleUpdateSettings({ aggregationMethod: m.id })}
+                className={`px-3 py-2 rounded-sm text-xs font-bold border transition cursor-pointer ${audition.aggregationMethod === m.id
+                  ? 'bg-slate-700 text-white border-slate-700'
+                  : 'bg-zinc-100 hover:bg-zinc-100 text-zinc-700 border-zinc-300'
+                  }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
 
-            <div className="space-y-2.5">
-              {/* ファイル1 */}
-              <div className="p-2.5 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-zinc-800">
-                    ① 集計結果＆全Rawデータ＆全体講評（3シート）
-                  </div>
-                  <div className="text-[11px] text-zinc-500">
-                    ランキング表 + 審査員別計算過程 + 全体講評
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <a
-                    href={`/api/admin/auditions/${audition.id}/export?target=summary_and_raw&format=xlsx`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs font-bold transition"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    .xlsx
-                  </a>
-                  <a
-                    href={`/api/admin/auditions/${audition.id}/export?target=summary_and_raw&format=csv`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-300 text-xs font-semibold transition"
-                  >
-                    .csv
-                  </a>
-                </div>
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-300">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={audition.isPenaltyEnabled}
+                  onChange={(e) =>
+                    handleUpdateSettings({ isPenaltyEnabled: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                />
+                ペナルティ減点を有効化
+              </label>
 
-              {/* ファイル2 */}
-              <div className="p-2.5 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-zinc-800">
-                    ② バンド別講評シート（各バンド＋全体講評）
-                  </div>
-                  <div className="text-[11px] text-zinc-500">
-                    正規化後点数(魅力/技術/合計) + コメント + 全体講評シート
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <a
-                    href={`/api/admin/auditions/${audition.id}/export?target=band_comments&format=xlsx`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs font-bold transition"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    .xlsx
-                  </a>
-                  <a
-                    href={`/api/admin/auditions/${audition.id}/export?target=band_comments&format=csv`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-300 text-xs font-semibold transition"
-                  >
-                    .csv
-                  </a>
-                </div>
-              </div>
+              <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showComparison}
+                  onChange={(e) => setShowComparison(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                />
+                3方式比較列
+              </label>
             </div>
           </div>
         </div>
@@ -319,16 +301,6 @@ export function AdminDashboardPage({
             }`}
         >
           全体講評 ({enteredFeedbackCount})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('evaluators')}
-          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'evaluators'
-            ? 'bg-slate-700 text-white'
-            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
-            }`}
-        >
-          審査員別 基準値・補正係数 ({evaluatorStats.length})
         </button>
       </div>
 
@@ -510,15 +482,27 @@ export function AdminDashboardPage({
               </span>
             </div>
 
-            <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={onlyUnsubmitted}
-                onChange={(e) => setOnlyUnsubmitted(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-              />
-              未提出者のみ表示
-            </label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={onlyUnsubmitted}
+                  onChange={(e) => setOnlyUnsubmitted(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                />
+                未提出者のみ表示
+              </label>
+
+              <button
+                type="button"
+                disabled={unsubmittedVoters.length === 0}
+                onClick={() => void handleCopyUnsubmittedList()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>未提出者リストをコピー</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden">
@@ -527,10 +511,10 @@ export function AdminDashboardPage({
                 <thead>
                   <tr className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
                     <th className="px-4 py-3">ステータス</th>
-                    <th className="px-4 py-3">氏名 / メール</th>
+                    <th className="px-4 py-3">氏名</th>
                     <th className="px-4 py-3">回生</th>
                     <th className="px-4 py-3">参加権限</th>
-                    <th className="px-4 py-3 text-right">入力進捗 (自バンド除外)</th>
+                    <th className="px-4 py-3 text-right">入力進捗・自バンド除外</th>
                     <th className="px-4 py-3">提出日時</th>
                   </tr>
                 </thead>
@@ -552,9 +536,6 @@ export function AdminDashboardPage({
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-zinc-800">{v.name}</div>
-                        <div className="text-xs text-zinc-400 font-mono">
-                          {v.email}
-                        </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-600">{v.grade}回生</td>
                       <td className="px-4 py-3">
@@ -609,7 +590,7 @@ export function AdminDashboardPage({
             </div>
           </div>
         </div>
-      ) : activeTab === 'generalFeedback' ? (
+      ) : (
         <div className="space-y-4">
           <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4 text-sm">
@@ -689,59 +670,70 @@ export function AdminDashboardPage({
             )}
           </div>
         </div>
-      ) : (
-        <div className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead>
-                <tr className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
-                  <th className="px-4 py-3">審査員名</th>
-                  <th className="px-4 py-3">権限区分</th>
-                  <th className="px-4 py-3 text-right">有効採点数</th>
-                  <th className="px-4 py-3 text-right">最高点(MAX)</th>
-                  <th className="px-4 py-3 text-right">最低点(MIN)</th>
-                  <th className="px-4 py-3 text-right">点差(Diff)</th>
-                  <th className="px-4 py-3 text-right">
-                    補正係数 ({audition?.standardDiff ?? 100}/Diff)
-                  </th>
-                  <th className="px-4 py-3 text-right">素点平均</th>
-                  <th className="px-4 py-3 text-right">標準偏差</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
-                {evaluatorStats.map((e) => (
-                  <tr key={e.userId} className="hover:bg-zinc-100">
-                    <td className="px-4 py-3 font-sans font-bold text-zinc-800">
-                      {e.userName}
-                    </td>
-                    <td className="px-4 py-3 font-sans text-xs">
-                      {e.permissionType === 'SCORE_AND_COMMENT'
-                        ? '採点＋コメント'
-                        : 'コメントのみ'}
-                    </td>
-                    <td className="px-4 py-3 text-right">{e.validVoteCount}</td>
-                    <td className="px-4 py-3 text-right">
-                      {e.maxScore !== null ? e.maxScore.toFixed(1) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {e.minScore !== null ? e.minScore.toFixed(1) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {e.diff !== null ? e.diff.toFixed(1) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-700">
-                      {e.correctionFactor.toFixed(3)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {e.meanScore !== null ? e.meanScore.toFixed(2) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {e.stdDev !== null ? e.stdDev.toFixed(2) : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      )}
+
+      {/* 2ファイル Excel / CSV エクスポートパネル */}
+      {audition && (
+        <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-3">
+          <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+            Excel / CSV データエクスポート
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* ファイル1 */}
+            <div className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-zinc-800">
+                  ① 集計結果＆全Rawデータ＆全体講評
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  ランキング表 + 審査員別計算過程 + 全体講評シート
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={`/api/admin/auditions/${audition.id}/export?target=summary_and_raw&format=xlsx`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  .xlsx
+                </a>
+                <a
+                  href={`/api/admin/auditions/${audition.id}/export?target=summary_and_raw&format=csv`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-300 text-xs font-semibold transition"
+                >
+                  .csv
+                </a>
+              </div>
+            </div>
+
+            {/* ファイル2 */}
+            <div className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-zinc-800">
+                  ② バンド別講評シート
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  各バンドの正規化後点数 + コメント + 全体講評シート
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={`/api/admin/auditions/${audition.id}/export?target=band_comments&format=xlsx`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  .xlsx
+                </a>
+                <a
+                  href={`/api/admin/auditions/${audition.id}/export?target=band_comments&format=csv`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-300 text-xs font-semibold transition"
+                >
+                  .csv
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

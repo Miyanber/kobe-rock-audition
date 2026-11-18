@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateGrade,
   getAcademicYear,
+  getAcademicYearFromDateString,
   isActiveClubGrade,
 } from '../grade.ts';
 
@@ -12,6 +13,10 @@ describe('grade (4月基準の回生計算・現役判定)', () => {
 
     expect(getAcademicYear(marchEnd)).toBe(2025);
     expect(getAcademicYear(aprilStart)).toBe(2026);
+    expect(getAcademicYearFromDateString('2026-03-31')).toBe(2025);
+    expect(getAcademicYearFromDateString('2026-04-01')).toBe(2026);
+    expect(getAcademicYearFromDateString('2027-02-15')).toBe(2026);
+    expect(getAcademicYearFromDateString('2027-04-15')).toBe(2027);
 
     // 2023年入部生: 2026年3月31日時点では3回生、4月1日時点で4回生になる
     expect(calculateGrade(2023, marchEnd)).toBe(3);
