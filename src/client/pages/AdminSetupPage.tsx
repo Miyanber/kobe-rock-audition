@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   FilePlus2,
   GripVertical,
   Play,
@@ -10,6 +11,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Sliders,
   Trash2,
   Upload,
   UserCheck,
@@ -49,7 +51,16 @@ type SetupSectionId =
   | 'setup-status'
   | 'setup-voters'
   | 'setup-band-order'
-  | 'setup-bands';
+  | 'setup-bands'
+  | 'setup-advanced';
+
+const INITIAL_OPEN_SECTIONS: Record<SetupSectionId, boolean> = {
+  'setup-status': true,
+  'setup-voters': false,
+  'setup-band-order': false,
+  'setup-bands': false,
+  'setup-advanced': false,
+};
 type PerformerFilter = 'ALL' | 'PERFORMERS_ONLY' | 'NON_PERFORMERS_ONLY';
 type PermissionFilter = 'ALL' | 'UNSET' | PermissionType;
 
@@ -76,6 +87,50 @@ function getTodayDateString(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function MobileSectionToggle({
+  step,
+  title,
+  icon: Icon,
+  iconClassName = 'text-slate-700',
+  badge,
+  isOpen,
+  onToggle,
+}: {
+  step: number;
+  title: string;
+  icon: typeof Play;
+  iconClassName?: string;
+  badge?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={isOpen}
+      className="w-full flex items-center justify-between gap-2 text-left lg:hidden cursor-pointer"
+    >
+      <span className="text-sm font-bold text-zinc-800 flex items-center gap-2 min-w-0">
+        <Icon className={`h-4 w-4 shrink-0 ${iconClassName}`} />
+        <span className="truncate">
+          {step}. {title}
+        </span>
+        {badge && (
+          <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-zinc-200 text-zinc-700 shrink-0">
+            {badge}
+          </span>
+        )}
+      </span>
+      <ChevronDown
+        className={`h-4 w-4 text-zinc-500 shrink-0 transition-transform ${
+          isOpen ? 'rotate-180' : ''
+        }`}
+      />
+    </button>
+  );
 }
 
 export function AdminSetupPage({
@@ -120,9 +175,12 @@ export function AdminSetupPage({
     }
   }, [showCreateModal]);
 
-  // 目次アクティブ状態
+  // 目次アクティブ状態 & モバイルアコーディオン開閉状態
   const [activeSection, setActiveSection] =
     useState<SetupSectionId>('setup-status');
+  const [openSections, setOpenSections] = useState<
+    Record<SetupSectionId, boolean>
+  >(INITIAL_OPEN_SECTIONS);
 
   // バンド一括登録
   const [bandsCsv, setBandsCsv] = useState('');
@@ -224,6 +282,7 @@ export function AdminSetupPage({
     setDeleteConfirmInput('');
     setShowActivateModal(false);
     setActiveSection('setup-status');
+    setOpenSections(INITIAL_OPEN_SECTIONS);
     void loadContext();
   }, [selectedAuditionId]);
 
@@ -234,6 +293,7 @@ export function AdminSetupPage({
       'setup-voters',
       'setup-band-order',
       'setup-bands',
+      'setup-advanced',
     ];
     const elements = sectionIds
       .map((id) => document.getElementById(id))
@@ -261,8 +321,13 @@ export function AdminSetupPage({
     return () => observer.disconnect();
   }, [selectedAudition?.id]);
 
+  const toggleSection = (id: SetupSectionId) => {
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const scrollToSection = (id: SetupSectionId) => {
     setActiveSection(id);
+    setOpenSections((prev) => ({ ...prev, [id]: true }));
     document.getElementById(id)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
@@ -699,6 +764,7 @@ export function AdminSetupPage({
       badge: `${auditionBands.length}組`,
     },
     { id: 'setup-bands', step: 4, label: 'バンド一括登録', icon: Upload },
+    { id: 'setup-advanced', step: 5, label: '詳細設定・削除', icon: Sliders },
   ];
 
   return (
@@ -742,46 +808,6 @@ export function AdminSetupPage({
         </section>
       ) : (
         <>
-          {/* モバイル・タブレット用ジャンプバー */}
-          <nav
-            aria-label="設定セクション目次"
-            className="lg:hidden flex items-center gap-1.5 overflow-x-auto pb-1"
-          >
-            {tocItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeSection === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={isActive ? 'location' : undefined}
-                  onClick={() => scrollToSection(item.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold border whitespace-nowrap transition cursor-pointer shrink-0 ${
-                    isActive
-                      ? 'bg-slate-700 text-white border-slate-700'
-                      : 'bg-zinc-50 text-zinc-700 border-zinc-300 hover:bg-zinc-100'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    {item.step}. {item.label}
-                  </span>
-                  {item.badge && (
-                    <span
-                      className={`px-1.5 py-0.5 rounded-sm text-[10px] font-semibold ${
-                        isActive
-                          ? 'bg-slate-600 text-slate-100'
-                          : 'bg-zinc-200 text-zinc-700'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
           <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 items-start">
             {/* デスクトップ用 左目次 */}
             <aside className="hidden lg:block lg:sticky lg:top-28">
@@ -829,115 +855,138 @@ export function AdminSetupPage({
               </div>
             </aside>
 
-            <div className="space-y-6 min-w-0">
+            <div className="space-y-4 lg:space-y-6 min-w-0">
               {/* 1. ステータス切替 */}
               <section
                 id="setup-status"
-                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-3"
               >
-                <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                <MobileSectionToggle
+                  step={1}
+                  title="進行ステータス"
+                  icon={Play}
+                  iconClassName="text-emerald-600"
+                  badge={getAuditionStatusLabel(selectedAudition.status)}
+                  isOpen={openSections['setup-status']}
+                  onToggle={() => toggleSection('setup-status')}
+                />
+                <h2 className="hidden lg:flex text-base font-bold text-zinc-800 items-center gap-2">
                   <Play className="h-5 w-5 text-emerald-600" />
                   進行ステータス切替：{selectedAudition.title}
                 </h2>
-                <p className="text-xs text-zinc-500">
-                  ① バンド募集中 → ② 募集締切・調整中 → ③ 採点受付中 → ④ 採点終了・集計 の順に進めてください
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                  {AUDITION_STATUS_LIST.map((meta) => {
-                    const isSelected = selectedAudition.status === meta.status;
-                    return (
-                      <button
-                        key={meta.status}
-                        type="button"
-                        onClick={() => handleChangeStatus(meta.status)}
-                        className={`p-3 rounded-sm text-left border transition cursor-pointer flex flex-col gap-1 ${
-                          isSelected
-                            ? 'bg-slate-700 text-white border-slate-900'
-                            : 'bg-zinc-100 hover:bg-zinc-200/70 text-zinc-800 border-zinc-300'
-                        }`}
-                      >
-                        <span className="text-sm font-bold">
-                          {meta.step}. {meta.label}
-                        </span>
-                        <span
-                          className={`text-[11px] leading-snug ${
-                            isSelected ? 'text-slate-200' : 'text-zinc-500'
+                <div
+                  className={`${
+                    openSections['setup-status'] ? 'block' : 'hidden'
+                  } lg:block space-y-3 pt-1 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
+                >
+                  <p className="text-xs text-zinc-500">
+                    ① バンド募集中 → ② 募集締切・調整中 → ③ 採点受付中 → ④ 採点終了・集計 の順に進めてください
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    {AUDITION_STATUS_LIST.map((meta) => {
+                      const isSelected = selectedAudition.status === meta.status;
+                      return (
+                        <button
+                          key={meta.status}
+                          type="button"
+                          onClick={() => handleChangeStatus(meta.status)}
+                          className={`p-3 rounded-sm text-left border transition cursor-pointer flex flex-col gap-1 ${
+                            isSelected
+                              ? 'bg-slate-700 text-white border-slate-900'
+                              : 'bg-zinc-100 hover:bg-zinc-200/70 text-zinc-800 border-zinc-300'
                           }`}
                         >
-                          {meta.shortDescription}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* 締切設定（バンド募集締切・採点締切） */}
-                <form
-                  onSubmit={handleSaveDeadlines}
-                  className="pt-3 border-t border-zinc-200 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
-                >
-                  <div className="space-y-1">
-                    <label
-                      htmlFor="setup-entry-deadline"
-                      className="flex items-center justify-between text-xs font-bold text-zinc-700"
-                    >
-                      <span>
-                        バンド募集締切 <span className="text-rose-500">*</span>
-                      </span>
-                      {isDeadlineExpired(selectedAudition.entryDeadline) && (
-                        <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-sm">
-                          締切超過
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      id="setup-entry-deadline"
-                      type="datetime-local"
-                      required
-                      value={entryDeadlineDraft}
-                      onChange={(e) => setEntryDeadlineDraft(e.target.value)}
-                      className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
-                    />
+                          <span className="text-sm font-bold">
+                            {meta.step}. {meta.label}
+                          </span>
+                          <span
+                            className={`text-[11px] leading-snug ${
+                              isSelected ? 'text-slate-200' : 'text-zinc-500'
+                            }`}
+                          >
+                            {meta.shortDescription}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="space-y-1">
-                    <label
-                      htmlFor="setup-scoring-deadline"
-                      className="flex items-center justify-between text-xs font-bold text-zinc-700"
-                    >
-                      <span>採点締切</span>
-                      {isDeadlineExpired(selectedAudition.scoringDeadline) && (
-                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-sm">
-                          締切超過（未入力のみ可）
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      id="setup-scoring-deadline"
-                      type="datetime-local"
-                      value={scoringDeadlineDraft}
-                      onChange={(e) => setScoringDeadlineDraft(e.target.value)}
-                      className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={savingDeadlines}
-                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                  {/* 締切設定（バンド募集締切・採点締切） */}
+                  <form
+                    onSubmit={handleSaveDeadlines}
+                    className="pt-3 border-t border-zinc-200 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
                   >
-                    <Save className="h-3.5 w-3.5" />
-                    {savingDeadlines ? '保存中...' : '締切を保存'}
-                  </button>
-                </form>
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="setup-entry-deadline"
+                        className="flex items-center justify-between text-xs font-bold text-zinc-700"
+                      >
+                        <span>
+                          バンド募集締切 <span className="text-rose-500">*</span>
+                        </span>
+                        {isDeadlineExpired(selectedAudition.entryDeadline) && (
+                          <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-sm">
+                            締切超過
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        id="setup-entry-deadline"
+                        type="datetime-local"
+                        required
+                        value={entryDeadlineDraft}
+                        onChange={(e) => setEntryDeadlineDraft(e.target.value)}
+                        className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="setup-scoring-deadline"
+                        className="flex items-center justify-between text-xs font-bold text-zinc-700"
+                      >
+                        <span>採点締切</span>
+                        {isDeadlineExpired(selectedAudition.scoringDeadline) && (
+                          <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-sm">
+                            締切超過（未入力のみ可）
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        id="setup-scoring-deadline"
+                        type="datetime-local"
+                        value={scoringDeadlineDraft}
+                        onChange={(e) => setScoringDeadlineDraft(e.target.value)}
+                        className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={savingDeadlines}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingDeadlines ? '保存中...' : '締切を保存'}
+                    </button>
+                  </form>
+                </div>
               </section>
 
               {/* 2. 採点・コメント義務設定 */}
               <section
                 id="setup-voters"
-                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4"
               >
-                <div className="flex items-center justify-between flex-wrap gap-2">
+                <MobileSectionToggle
+                  step={2}
+                  title="採点・コメント義務設定"
+                  icon={UserCheck}
+                  badge={`${currentVoters.length}名`}
+                  isOpen={openSections['setup-voters']}
+                  onToggle={() => toggleSection('setup-voters')}
+                />
+                <div className="hidden lg:flex items-center justify-between flex-wrap gap-2">
                   <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
                     <UserCheck className="h-5 w-5 text-slate-700" />
                     採点・コメント義務設定
@@ -946,6 +995,14 @@ export function AdminSetupPage({
                     ※4月基準で1〜3回生のみ表示
                   </span>
                 </div>
+                <div
+                  className={`${
+                    openSections['setup-voters'] ? 'block' : 'hidden'
+                  } lg:block space-y-4 pt-2 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
+                >
+                  <p className="text-[11px] text-zinc-500 lg:hidden">
+                    ※4月基準で1〜3回生のみ表示
+                  </p>
 
                 {/* 設定状況サマリー（クリックで下の表を絞り込み） */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -1325,20 +1382,34 @@ export function AdminSetupPage({
                     </tbody>
                   </table>
                 </div>
+                </div>
               </section>
 
               {/* 3. バンド出演順（動画順）の並び替え */}
               <section
                 id="setup-band-order"
-                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4"
               >
+                <MobileSectionToggle
+                  step={3}
+                  title="バンド出演順の並び替え"
+                  icon={ArrowUpDown}
+                  badge={`${auditionBands.length}組`}
+                  isOpen={openSections['setup-band-order']}
+                  onToggle={() => toggleSection('setup-band-order')}
+                />
+                <div
+                  className={`${
+                    openSections['setup-band-order'] ? 'block' : 'hidden'
+                  } lg:block space-y-4 pt-2 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
+                >
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                    <h2 className="hidden lg:flex text-base font-bold text-zinc-800 items-center gap-2">
                       <ArrowUpDown className="h-5 w-5 text-slate-700" />
                       バンド出演順の並び替え
                     </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="text-xs text-zinc-500 lg:mt-0.5">
                       ↑↓ボタンまたはドラッグ＆ドロップで出演順に並び替え、保存してください。1から連番で反映されます。
                     </p>
                   </div>
@@ -1464,15 +1535,28 @@ export function AdminSetupPage({
                     })}
                   </div>
                 )}
+                </div>
               </section>
 
               {/* 4. バンド・出演順・メンバー CSV一括登録 */}
               <section
                 id="setup-bands"
-                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-3"
               >
+                <MobileSectionToggle
+                  step={4}
+                  title="バンド一括登録"
+                  icon={Upload}
+                  isOpen={openSections['setup-bands']}
+                  onToggle={() => toggleSection('setup-bands')}
+                />
+                <div
+                  className={`${
+                    openSections['setup-bands'] ? 'block' : 'hidden'
+                  } lg:block space-y-3 pt-2 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
+                >
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
+                  <h2 className="hidden lg:flex text-base font-bold text-zinc-800 items-center gap-2">
                     <Upload className="h-5 w-5 text-slate-700" />
                     参加バンド・出演順・メンバー 一括登録
                   </h2>
@@ -1528,84 +1612,108 @@ export function AdminSetupPage({
                     </ul>
                   </div>
                 )}
-              </section>
-
-              {/* 詳細設定: 過去イベント表示 */}
-              {onToggleShowOldAuditions && (
-                <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
-                  <div className="space-y-0.5">
-                    <h2 className="text-sm font-bold text-zinc-800">
-                      表示設定：半年以上前のイベントを表示
-                    </h2>
-                    <p className="text-xs text-zinc-500">
-                      開催日から半年以上経過したイベントは一覧の整理のためデフォルトで非表示になります。過去イベントを選択・閲覧する場合はONにしてください。
-                      {oldAuditionCount > 0 && `（対象イベント: ${oldAuditionCount}件）`}
-                    </p>
-                  </div>
-                  <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white text-xs font-bold text-zinc-800 cursor-pointer shrink-0 select-none">
-                    <input
-                      type="checkbox"
-                      checked={showOldAuditions}
-                      onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                    />
-                    <span>{showOldAuditions ? '表示中' : '非表示'}</span>
-                  </label>
-                </section>
-              )}
-
-              {/* 詳細設定: 点差補正定数 */}
-              <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
-                <div className="space-y-0.5">
-                  <h2 className="text-sm font-bold text-zinc-800">
-                    詳細設定：点差補正定数（既定値 100）
-                  </h2>
-                  <p className="text-xs text-zinc-500">
-                    Min-Max 点差補正の換算満点です。通常は 100 固定を推奨し、過去Excelと比較する場合のみ 10 等に変更してください。
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    step={1}
-                    value={standardDiffDraft}
-                    onChange={(e) => setStandardDiffDraft(e.target.value)}
-                    className="w-20 rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-bold text-right"
-                  />
-                  <button
-                    type="button"
-                    disabled={savingStandardDiff}
-                    onClick={handleUpdateStandardDiff}
-                    className="px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
-                  >
-                    {savingStandardDiff ? '保存中...' : '定数変更'}
-                  </button>
                 </div>
               </section>
 
-              {/* 危険な操作: イベント削除 */}
-              <section className="bg-rose-50/40 border border-rose-200 rounded-sm p-5 flex items-center justify-between flex-wrap gap-3">
-                <div className="space-y-0.5">
-                  <h2 className="text-sm font-bold text-rose-800">
-                    イベントの削除
-                  </h2>
-                  <p className="text-xs text-rose-700/90">
-                    対象「{selectedAudition.title}」に紐づくバンド・参加権限・採点データもすべて削除されます。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteConfirmInput('');
-                    setShowDeleteModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm text-xs font-bold border border-rose-300 bg-white hover:bg-rose-100 text-rose-700 transition cursor-pointer shrink-0"
+              {/* 5. 詳細設定・削除 */}
+              <section
+                id="setup-advanced"
+                className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-4"
+              >
+                <MobileSectionToggle
+                  step={5}
+                  title="詳細設定・削除"
+                  icon={Sliders}
+                  isOpen={openSections['setup-advanced']}
+                  onToggle={() => toggleSection('setup-advanced')}
+                />
+                <h2 className="hidden lg:flex text-base font-bold text-zinc-800 items-center gap-2">
+                  <Sliders className="h-5 w-5 text-slate-700" />
+                  詳細設定・削除
+                </h2>
+                <div
+                  className={`${
+                    openSections['setup-advanced'] ? 'block' : 'hidden'
+                  } lg:block space-y-4 pt-2 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  このイベントを削除
-                </button>
+                  {/* 詳細設定: 過去イベント表示 */}
+                  {onToggleShowOldAuditions && (
+                    <div className="bg-white border border-zinc-300 rounded-sm p-4 flex items-center justify-between flex-wrap gap-3">
+                      <div className="space-y-0.5">
+                        <h3 className="text-sm font-bold text-zinc-800">
+                          表示設定：半年以上前のイベントを表示
+                        </h3>
+                        <p className="text-xs text-zinc-500">
+                          開催日から半年以上経過したイベントは一覧の整理のためデフォルトで非表示になります。過去イベントを選択・閲覧する場合はONにしてください。
+                          {oldAuditionCount > 0 && `（対象イベント: ${oldAuditionCount}件）`}
+                        </p>
+                      </div>
+                      <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-zinc-300 bg-zinc-50 text-xs font-bold text-zinc-800 cursor-pointer shrink-0 select-none">
+                        <input
+                          type="checkbox"
+                          checked={showOldAuditions}
+                          onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                        />
+                        <span>{showOldAuditions ? '表示中' : '非表示'}</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* 詳細設定: 点差補正定数 */}
+                  <div className="bg-white border border-zinc-300 rounded-sm p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-bold text-zinc-800">
+                        詳細設定：点差補正定数（既定値 100）
+                      </h3>
+                      <p className="text-xs text-zinc-500">
+                        Min-Max 点差補正の換算満点です。通常は 100 固定を推奨し、過去Excelと比較する場合のみ 10 等に変更してください。
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={standardDiffDraft}
+                        onChange={(e) => setStandardDiffDraft(e.target.value)}
+                        className="w-20 rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-bold text-right"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingStandardDiff}
+                        onClick={handleUpdateStandardDiff}
+                        className="px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                      >
+                        {savingStandardDiff ? '保存中...' : '定数変更'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 危険な操作: イベント削除 */}
+                  <div className="bg-rose-50/50 border border-rose-200 rounded-sm p-4 flex items-center justify-between flex-wrap gap-3">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-bold text-rose-800">
+                        イベントの削除
+                      </h3>
+                      <p className="text-xs text-rose-700/90">
+                        対象「{selectedAudition.title}」に紐づくバンド・参加権限・採点データもすべて削除されます。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteConfirmInput('');
+                        setShowDeleteModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm text-xs font-bold border border-rose-300 bg-white hover:bg-rose-100 text-rose-700 transition cursor-pointer shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      このイベントを削除
+                    </button>
+                  </div>
+                </div>
               </section>
             </div>
           </div>
