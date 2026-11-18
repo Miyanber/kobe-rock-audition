@@ -7,7 +7,6 @@ import {
   Search,
   Trash2,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
@@ -90,13 +89,26 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
     void loadBandsForAudition(auditionId);
   }, [auditionId, loadBandsForAudition]);
 
+  const sortedBands = useMemo(
+    () =>
+      [...bands].sort((a, b) => {
+        if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+        return b.performanceOrder - a.performanceOrder;
+      }),
+    [bands],
+  );
+
+  const editingBand = useMemo(
+    () => (editingBandId ? bands.find((b) => b.id === editingBandId) ?? null : null),
+    [bands, editingBandId],
+  );
+
   const filteredUsers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
     if (!q) return allUsers;
     return allUsers.filter(
       (u) =>
         u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
         `${u.grade}回生`.includes(q),
     );
   }, [allUsers, memberSearch]);
@@ -231,17 +243,9 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
           {audition.status !== 'DRAFT' && (
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-sm">
               <Lock className="h-3.5 w-3.5" />
-              {audition.status === 'ENTRY_CLOSED'
-                ? user.role === 'ADMIN'
-                  ? '募集締切・調整中（一般部員ロック中・運営権限で編集可）'
-                  : 'バンド募集は締め切られました（閲覧専用・運営が出演順等を調整中）'
-                : audition.status === 'ACTIVE'
-                  ? user.role === 'ADMIN'
-                    ? '採点受付中（一般部員ロック中・運営権限で編集可）'
-                    : '採点受付中のため閲覧専用です（編集ロック）'
-                  : user.role === 'ADMIN'
-                    ? '採点終了・集計済み（一般部員ロック中・運営権限で編集可）'
-                    : '採点終了・集計済みのため閲覧専用です（編集ロック）'}
+              {user.role === 'ADMIN'
+                ? 'バンド募集終了のため閲覧のみ / 管理者権限で編集可'
+                : 'バンド募集終了のため閲覧のみ'}
             </div>
           )}
         </div>
@@ -260,94 +264,81 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
       />
 
       {/* バンド一覧 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {bands.map((band) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {sortedBands.map((band) => {
           const isOwn = ownBandIds.includes(band.id);
           return (
             <div
               key={band.id}
-              className={`bg-zinc-50 border rounded-sm p-4 sm:p-5 flex flex-col justify-between gap-4 ${
+              className={`bg-zinc-50 border rounded-sm p-3.5 sm:p-4 space-y-2.5 ${
                 isOwn ? 'border-slate-300 ring-1' : 'border-zinc-300'
               }`}
             >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-sm bg-slate-700 text-white font-bold text-sm shrink-0">
-                      {band.performanceOrder}
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-zinc-800 text-base truncate">
-                        {band.name}
-                      </h3>
-                      {isOwn && (
-                        <span className="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-sm mt-0.5">
-                          あなたが所属
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {canEditWiki && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(band)}
-                        className="p-2 rounded-sm text-zinc-600 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                        title="編集"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteBand(band)}
-                        className="p-2 rounded-sm text-zinc-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
-                        title="削除"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 mb-1.5">
-                    <Users className="h-3.5 w-3.5" />
-                    メンバー ({band.members.length}名)
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {band.members.length === 0 ? (
-                      <span className="text-xs text-zinc-400">未設定</span>
-                    ) : (
-                      band.members.map((m) => (
-                        <span
-                          key={m.userId}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-xs font-medium border ${
-                            m.userId === user.id
-                              ? 'bg-slate-100 border-slate-300 text-slate-800 font-semibold'
-                              : 'bg-zinc-100 border-zinc-300 text-zinc-700'
-                          }`}
-                        >
-                          {m.name}
-                          <span className="text-[10px] text-zinc-500">
-                            ({m.grade}回)
-                          </span>
-                        </span>
-                      ))
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-sm bg-slate-700 text-white font-bold text-xs shrink-0">
+                    {band.performanceOrder}
+                  </span>
+                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-zinc-800 text-sm sm:text-base truncate">
+                      {band.name}
+                    </h3>
+                    {isOwn && (
+                      <span className="inline-block text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-sm shrink-0">
+                        あなたが所属
+                      </span>
                     )}
                   </div>
                 </div>
+
+                {canEditWiki && (
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(band)}
+                      className="p-1.5 rounded-sm text-zinc-600 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      title="編集"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBand(band)}
+                      className="p-1.5 rounded-sm text-zinc-600 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                      title="削除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="pt-2.5 border-t border-zinc-300 flex items-center justify-between text-[11px] text-zinc-400">
-                <span>最終更新者: {band.updatedByName ?? 'システム'}</span>
-                <span>{new Date(band.updatedAt).toLocaleString('ja-JP')}</span>
+              <div className="flex flex-wrap gap-1">
+                {band.members.length === 0 ? (
+                  <span className="text-xs text-zinc-400">未設定</span>
+                ) : (
+                  band.members.map((m) => (
+                    <span
+                      key={m.userId}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium border ${
+                        m.userId === user.id
+                          ? 'bg-slate-100 border-slate-300 text-slate-800 font-semibold'
+                          : 'bg-zinc-100 border-zinc-300 text-zinc-700'
+                      }`}
+                    >
+                      <span>{m.name}</span>
+                      <span className="text-[10px] text-zinc-500">
+                        {m.grade}回
+                      </span>
+                    </span>
+                  ))
+                )}
               </div>
             </div>
           );
         })}
 
-        {bands.length === 0 && (
+        {sortedBands.length === 0 && (
           <div className="col-span-full bg-zinc-50 border border-dashed border-zinc-300 rounded-sm p-10 text-center text-sm text-zinc-500">
             まだバンドが登録されていません。「バンドを登録」ボタンから追加してください。
           </div>
@@ -386,12 +377,12 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                 />
               </div>
 
-              {/* メンバー選択（部員マスタ検索） */}
+              {/* メンバー選択 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-zinc-700 flex items-center gap-1.5">
                     <UserPlus className="h-3.5 w-3.5" />
-                    所属メンバー選択（部員マスタから選択・表記揺れ防止）
+                    所属メンバー選択
                   </label>
                   <span className="text-xs font-semibold text-slate-700">
                     {selectedMemberIds.length}名選択中
@@ -412,7 +403,7 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-zinc-50 border border-slate-300 text-xs font-semibold text-slate-800 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 transition cursor-pointer"
                         >
                           <span>
-                            {u.name} ({u.grade}回)
+                            {u.name} {u.grade}回
                           </span>
                           <X className="h-3 w-3" />
                         </button>
@@ -427,7 +418,7 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                     type="text"
                     value={memberSearch}
                     onChange={(e) => setMemberSearch(e.target.value)}
-                    placeholder="氏名・メールアドレス・回生で検索..."
+                    placeholder="氏名・回生で検索..."
                     className="w-full rounded-sm border border-zinc-300 pl-9 pr-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
                   />
                 </div>
@@ -444,16 +435,13 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                           checked ? 'bg-slate-100' : ''
                         }`}
                       >
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-zinc-800 truncate">
-                            {u.name}{' '}
-                            <span className="text-xs text-zinc-500">
-                              ({u.grade}回生)
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-zinc-400 font-mono truncate">
-                            {u.email}
-                          </div>
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span className="text-sm font-medium text-zinc-800 truncate">
+                            {u.name}
+                          </span>
+                          <span className="text-xs text-zinc-500 shrink-0">
+                            {u.grade}回生
+                          </span>
                         </div>
                         <span
                           className={`h-5 w-5 rounded-sm border flex items-center justify-center shrink-0 ${
@@ -474,6 +462,15 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                   )}
                 </div>
               </div>
+
+              {editingBand && (
+                <div className="bg-zinc-100 border border-zinc-200 rounded-sm px-3 py-2 text-xs text-zinc-600 flex items-center justify-between gap-2 flex-wrap">
+                  <span>最終更新者: {editingBand.updatedByName ?? 'システム'}</span>
+                  <span>
+                    更新日時: {new Date(editingBand.updatedAt).toLocaleString('ja-JP')}
+                  </span>
+                </div>
+              )}
 
               <div className="pt-3 border-t border-zinc-300 flex items-center justify-end gap-2">
                 <button

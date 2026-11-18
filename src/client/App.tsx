@@ -166,6 +166,11 @@ export function App() {
     [auditions],
   );
 
+  const draftAudition = useMemo(
+    () => auditions.find((a) => a.status === 'DRAFT') ?? null,
+    [auditions],
+  );
+
   const closedAuditions = useMemo(
     () => auditions.filter((a) => a.status === 'CLOSED'),
     [auditions],
@@ -320,9 +325,12 @@ export function App() {
         auditions={auditions}
         selectedAuditionId={currentAudition.id}
         onSelectAudition={(nextId) => navigateTo(activeRoute, nextId)}
-        isAdmin={authInfo.user.role === 'ADMIN'}
+        activeRoute={activeRoute}
+        showStatusBanners={activeRoute !== 'admin-setup'}
         activeAudition={activeAudition}
+        draftAudition={draftAudition}
         onGoToActiveScoring={(id) => navigateTo('scoring', id)}
+        onGoToDraftBands={(id) => navigateTo('wiki', id)}
         actionSlot={
           authInfo.user.role === 'ADMIN' && activeRoute === 'admin-setup' ? (
             <button

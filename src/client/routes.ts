@@ -5,6 +5,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
+import { getAcademicYearFromDateString } from '../shared/grade.ts';
 import type { AuditionDto } from './types.ts';
 
 export type AppRoute =
@@ -245,5 +246,6 @@ export function buildDocumentTitle(
   if (route === 'admin-users' || !audition) {
     return `${label} | Kobe Rock Audition`;
   }
-  return `[${audition.eventDate}] ${audition.title} - ${label} | Kobe Rock Audition`;
+  const academicYear = getAcademicYearFromDateString(audition.eventDate);
+  return `[${academicYear}] ${audition.title} - ${label} | Kobe Rock Audition`;
 }
