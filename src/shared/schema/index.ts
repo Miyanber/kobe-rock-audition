@@ -21,7 +21,7 @@ export const PermissionTypeSchema = z.enum(['SCORE_AND_COMMENT', 'COMMENT_ONLY']
 export type PermissionType = z.infer<typeof PermissionTypeSchema>;
 
 export const CreateAuditionSchema = z.object({
-  title: z.string().trim().min(1, '開催回名を入力してください').max(100),
+  title: z.string().trim().min(1, 'イベント名を入力してください').max(100),
   eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '開催日はYYYY-MM-DD形式で入力してください'),
   deadline: z.string().nullable().optional(),
   isPenaltyEnabled: z.boolean().optional().default(false),
