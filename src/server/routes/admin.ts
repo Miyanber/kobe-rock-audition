@@ -33,6 +33,7 @@ import {
   type Role,
 } from '../../shared/schema/index.ts';
 import { calculateGrade, getAcademicYear } from '../../shared/grade.ts';
+import { parseJstDeadlineMs } from '../../shared/deadline.ts';
 import type { AppDb } from '../db/client.ts';
 
 const SHORT_ID_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -76,6 +77,15 @@ export const adminRoutes = new Hono<AppEnv>()
   .post('/auditions', zValidator('json', CreateAuditionSchema), async (c) => {
     const db = c.get('db');
     const body = c.req.valid('json');
+    if (parseJstDeadlineMs(body.entryDeadline) === null) {
+      return c.json({ error: 'バンド募集締切の日時形式が不正です。' }, 400);
+    }
+    if (
+      body.scoringDeadline &&
+      parseJstDeadlineMs(body.scoringDeadline) === null
+    ) {
+      return c.json({ error: '採点締切の日時形式が不正です。' }, 400);
+    }
     const now = Date.now();
     const id = await generateUniqueAuditionId(db);
 
@@ -83,7 +93,9 @@ export const adminRoutes = new Hono<AppEnv>()
       id,
       title: body.title,
       eventDate: body.eventDate,
-      deadline: body.deadline ?? null,
+      entryDeadline: body.entryDeadline,
+      scoringDeadline: body.scoringDeadline ?? null,
+      deadline: body.scoringDeadline ?? body.entryDeadline ?? body.deadline ?? null,
       status: 'DRAFT',
       isPenaltyEnabled: body.isPenaltyEnabled,
       aggregationMethod: body.aggregationMethod,
@@ -115,12 +127,46 @@ export const adminRoutes = new Hono<AppEnv>()
       return c.json({ error: 'オーディションが見つかりません。' }, 404);
     }
 
+    if (
+      body.entryDeadline !== undefined &&
+      parseJstDeadlineMs(body.entryDeadline) === null
+    ) {
+      return c.json({ error: 'バンド募集締切の日時形式が不正です。' }, 400);
+    }
+    if (
+      body.scoringDeadline !== undefined &&
+      body.scoringDeadline !== null &&
+      body.scoringDeadline !== '' &&
+      parseJstDeadlineMs(body.scoringDeadline) === null
+    ) {
+      return c.json({ error: '採点締切の日時形式が不正です。' }, 400);
+    }
+
+    const nextScoringDeadline =
+      body.scoringDeadline !== undefined
+        ? body.scoringDeadline || null
+        : existing.scoringDeadline;
+    const nextEntryDeadline =
+      body.entryDeadline !== undefined
+        ? body.entryDeadline
+        : existing.entryDeadline;
+
     await db
       .update(auditions)
       .set({
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.eventDate !== undefined ? { eventDate: body.eventDate } : {}),
-        ...(body.deadline !== undefined ? { deadline: body.deadline } : {}),
+        ...(body.entryDeadline !== undefined
+          ? { entryDeadline: body.entryDeadline }
+          : {}),
+        ...(body.scoringDeadline !== undefined
+          ? { scoringDeadline: nextScoringDeadline }
+          : {}),
+        ...(body.deadline !== undefined
+          ? { deadline: body.deadline }
+          : body.scoringDeadline !== undefined || body.entryDeadline !== undefined
+            ? { deadline: nextScoringDeadline ?? nextEntryDeadline ?? existing.deadline }
+            : {}),
         ...(body.isPenaltyEnabled !== undefined
           ? { isPenaltyEnabled: body.isPenaltyEnabled }
           : {}),
@@ -148,7 +194,7 @@ export const adminRoutes = new Hono<AppEnv>()
     async (c) => {
       const db = c.get('db');
       const id = c.req.param('id');
-      const { status } = c.req.valid('json');
+      const { status, scoringDeadline } = c.req.valid('json');
 
       const [existing] = await db
         .select()
@@ -162,11 +208,23 @@ export const adminRoutes = new Hono<AppEnv>()
 
       const now = Date.now();
       if (status === 'ACTIVE') {
+        const nextScoringDeadline = scoringDeadline?.trim() ?? '';
+        if (
+          !nextScoringDeadline ||
+          parseJstDeadlineMs(nextScoringDeadline) === null
+        ) {
+          return c.json(
+            { error: '採点受付中へ切り替えるには採点締切の設定が必須です。' },
+            400,
+          );
+        }
         // 単一UPDATE文で既存のACTIVEをすべて自動的にCLOSEDへ切り替え、対象のみACTIVEにする
         await db
           .update(auditions)
           .set({
             status: sql`CASE WHEN ${auditions.id} = ${id} THEN 'ACTIVE' ELSE 'CLOSED' END`,
+            scoringDeadline: sql`CASE WHEN ${auditions.id} = ${id} THEN ${nextScoringDeadline} ELSE ${auditions.scoringDeadline} END`,
+            deadline: sql`CASE WHEN ${auditions.id} = ${id} THEN ${nextScoringDeadline} ELSE ${auditions.deadline} END`,
             updatedAt: now,
           })
           .where(sql`${auditions.id} = ${id} OR ${auditions.status} = 'ACTIVE'`);

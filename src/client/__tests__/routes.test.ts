@@ -18,6 +18,8 @@ function makeAudition(
   return {
     title: overrides.id,
     deadline: null,
+    entryDeadline: '2026-12-01T23:59',
+    scoringDeadline: null,
     isPenaltyEnabled: false,
     aggregationMethod: 'DIFF_CORRECTION',
     standardDiff: 10,

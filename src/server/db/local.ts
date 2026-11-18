@@ -28,6 +28,8 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
       title TEXT NOT NULL,
       event_date TEXT NOT NULL,
       deadline TEXT,
+      entry_deadline TEXT NOT NULL DEFAULT '',
+      scoring_deadline TEXT,
       status TEXT NOT NULL DEFAULT 'DRAFT',
       is_penalty_enabled INTEGER NOT NULL DEFAULT 0,
       aggregation_method TEXT NOT NULL DEFAULT 'DIFF_CORRECTION',
@@ -94,6 +96,21 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
     sqlite.exec(
       `ALTER TABLE audition_voters ADD COLUMN general_feedback TEXT NOT NULL DEFAULT '';`,
     );
+  }
+
+  const auditionCols = sqlite
+    .prepare(`PRAGMA table_info(auditions)`)
+    .all() as Array<{ name: string }>;
+  if (!auditionCols.some((col) => col.name === 'entry_deadline')) {
+    sqlite.exec(
+      `ALTER TABLE auditions ADD COLUMN entry_deadline TEXT NOT NULL DEFAULT '';`,
+    );
+    sqlite.exec(
+      `UPDATE auditions SET entry_deadline = COALESCE(deadline, event_date || 'T23:59') WHERE entry_deadline = '';`,
+    );
+  }
+  if (!auditionCols.some((col) => col.name === 'scoring_deadline')) {
+    sqlite.exec(`ALTER TABLE auditions ADD COLUMN scoring_deadline TEXT;`);
   }
 }
 

@@ -32,6 +32,8 @@ export const auditions = sqliteTable(
     title: text('title').notNull(),
     eventDate: text('event_date').notNull(),
     deadline: text('deadline'),
+    entryDeadline: text('entry_deadline').notNull().default(''),
+    scoringDeadline: text('scoring_deadline'),
     status: text('status', { enum: AUDITION_STATUS_VALUES })
       .notNull()
       .default('DRAFT'),

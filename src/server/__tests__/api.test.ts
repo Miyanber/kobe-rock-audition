@@ -139,7 +139,10 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
           'Content-Type': 'application/json',
           Cookie: adminCookie,
         },
-        body: JSON.stringify({ status: 'ACTIVE' }),
+        body: JSON.stringify({
+          status: 'ACTIVE',
+          scoringDeadline: '2027-04-20T23:59',
+        }),
       },
     );
     expect(activateRes.status).toBe(200);
@@ -913,6 +916,7 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       body: JSON.stringify({
         title: '2027 新歓ライブ',
         eventDate: '2027-04-20',
+        entryDeadline: '2027-04-15T23:59',
       }),
     });
     expect(createRes.status).toBe(201);
@@ -972,6 +976,320 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
         expect(band.members.every((m) => m.email === undefined)).toBe(true);
       }
     }
+  });
+
+  it('バンド募集締切の必須化・採点締切設定・締切超過後の権限制御（未入力のみ許可）が動作する', async () => {
+    const adminCookie = await loginAs('u-admin');
+    const voter1Cookie = await loginAs('u-voter1');
+    const voter2Cookie = await loginAs('u-voter2');
+
+    // 1) entryDeadline 未指定でのイベント作成は 400
+    const missingEntryDeadlineRes = await app.request('/api/admin/auditions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        title: '締切未指定イベント',
+        eventDate: '2027-05-01',
+      }),
+    });
+    expect(missingEntryDeadlineRes.status).toBe(400);
+
+    // 2) scoringDeadline 未指定での ACTIVE 切替は 400
+    const missingScoringDeadlineRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/status',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({ status: 'ACTIVE' }),
+      },
+    );
+    expect(missingScoringDeadlineRes.status).toBe(400);
+
+    // scoringDeadline 指定で ACTIVE 切替成功 (200)
+    const activateOkRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/status',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          status: 'ACTIVE',
+          scoringDeadline: '2027-04-20T23:59',
+        }),
+      },
+    );
+    expect(activateOkRes.status).toBe(200);
+    const activateOkBody = (await activateOkRes.json()) as {
+      audition: { status: string; scoringDeadline: string | null };
+    };
+    expect(activateOkBody.audition.status).toBe('ACTIVE');
+    expect(activateOkBody.audition.scoringDeadline).toBe('2027-04-20T23:59');
+
+    // 3) entryDeadline 超過後、DRAFT でも一般部員のバンド追加・編集・削除は 403、ADMIN は可能
+    const expiredDraftCreate = await app.request('/api/admin/auditions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        title: '募集締切超過イベント',
+        eventDate: '2026-11-25',
+        entryDeadline: '2020-01-01T23:59',
+      }),
+    });
+    expect(expiredDraftCreate.status).toBe(201);
+    const expiredDraftBody = (await expiredDraftCreate.json()) as {
+      audition: { id: string };
+    };
+    const expiredDraftId = expiredDraftBody.audition.id;
+
+    const bandsCtxRes = await app.request(
+      `/api/auditions/${expiredDraftId}/bands`,
+      { headers: { Cookie: voter1Cookie } },
+    );
+    expect(bandsCtxRes.status).toBe(200);
+    const bandsCtx = (await bandsCtxRes.json()) as { canEditWiki: boolean };
+    expect(bandsCtx.canEditWiki).toBe(false);
+
+    const voterBandAddRes = await app.request(
+      `/api/auditions/${expiredDraftId}/bands`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter1Cookie,
+        },
+        body: JSON.stringify({ name: 'Late Band', memberUserIds: [] }),
+      },
+    );
+    expect(voterBandAddRes.status).toBe(403);
+
+    const adminBandAddRes = await app.request(
+      `/api/auditions/${expiredDraftId}/bands`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({ name: 'Admin Added Band', memberUserIds: [] }),
+      },
+    );
+    expect(adminBandAddRes.status).toBe(201);
+    const adminAdded = (await adminBandAddRes.json()) as {
+      band: { id: string };
+    };
+
+    const voterBandEditRes = await app.request(
+      `/api/auditions/${expiredDraftId}/bands/${adminAdded.band.id}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter1Cookie,
+        },
+        body: JSON.stringify({ name: 'Edited By Voter', memberUserIds: [] }),
+      },
+    );
+    expect(voterBandEditRes.status).toBe(403);
+
+    const voterBandDeleteRes = await app.request(
+      `/api/auditions/${expiredDraftId}/bands/${adminAdded.band.id}`,
+      {
+        method: 'DELETE',
+        headers: { Cookie: voter1Cookie },
+      },
+    );
+    expect(voterBandDeleteRes.status).toBe(403);
+
+    // 4) 採点締切超過後は「未入力のみ新規保存・初回提出可」「保存済み・提出済みは上書き不可(403)」
+    // まず aud-2026-winter を再び ACTIVE に戻し、u-voter2 が b-win-2 だけ締切前に保存、u-voter1 は提出済みの状態にする
+    await app.request('/api/admin/auditions/aud-2026-winter/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        status: 'ACTIVE',
+        scoringDeadline: '2027-01-01T23:59',
+      }),
+    });
+
+    const preDeadlineSave = await app.request(
+      '/api/auditions/aud-2026-winter/scores/b-win-2',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          techScore: 40,
+          charmScore: 41,
+          comment: '締切前保存',
+        }),
+      },
+    );
+    expect(preDeadlineSave.status).toBe(200);
+
+    // 採点締切を過去日時へ変更
+    const expireScoringRes = await app.request(
+      '/api/admin/auditions/aud-2026-winter',
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          scoringDeadline: '2020-01-01T23:59',
+        }),
+      },
+    );
+    expect(expireScoringRes.status).toBe(200);
+
+    // 提出済みユーザー (u-voter1) は未入力追加も再提出も 403
+    const submittedUserEdit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/b-win-1',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter1Cookie,
+        },
+        body: JSON.stringify({
+          techScore: 30,
+          charmScore: 30,
+          comment: '締切後変更試行',
+        }),
+      },
+    );
+    expect(submittedUserEdit.status).toBe(403);
+
+    // 未提出ユーザー (u-voter2) でも保存済みの b-win-2 への上書きは 403
+    const overwriteSavedBand = await app.request(
+      '/api/auditions/aud-2026-winter/scores/b-win-2',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          techScore: 45,
+          charmScore: 45,
+          comment: '上書き試行',
+        }),
+      },
+    );
+    expect(overwriteSavedBand.status).toBe(403);
+
+    // 未保存の b-win-3 への単体保存は 200
+    const saveUnsavedBand = await app.request(
+      '/api/auditions/aud-2026-winter/scores/b-win-3',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          techScore: 38,
+          charmScore: 39,
+          comment: '締切後未入力バンド保存',
+        }),
+      },
+    );
+    expect(saveUnsavedBand.status).toBe(200);
+
+    // 一括提出で保存済みバンド (b-win-2) を改変しようとすると 403
+    const tamperSubmit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 10, charmScore: 10, comment: '改変' },
+            { bandId: 'b-win-3', techScore: 38, charmScore: 39, comment: '締切後未入力バンド保存' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 43, comment: '初回提出' },
+          ],
+          generalFeedback: '締切後の初回提出総括',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(tamperSubmit.status).toBe(403);
+
+    // 保存済みバンドはそのまま維持し、残りの未入力バンド (b-win-4) と未入力全体講評を送って初回最終提出は 200
+    const validLateSubmit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 40, charmScore: 41, comment: '締切前保存' },
+            { bandId: 'b-win-3', techScore: 38, charmScore: 39, comment: '締切後未入力バンド保存' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 43, comment: '初回提出' },
+          ],
+          generalFeedback: '締切後の初回提出総括',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(validLateSubmit.status).toBe(200);
+
+    // 初回提出後は締切後なので全体講評も再提出も不可 (403)
+    const afterSubmitGeneralFeedback = await app.request(
+      '/api/auditions/aud-2026-winter/general-feedback',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({ generalFeedback: '再編集試行' }),
+      },
+    );
+    expect(afterSubmitGeneralFeedback.status).toBe(403);
+
+    const afterSubmitResubmit = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 40, charmScore: 41, comment: '締切前保存' },
+            { bandId: 'b-win-3', techScore: 38, charmScore: 39, comment: '締切後未入力バンド保存' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 43, comment: '初回提出' },
+          ],
+          generalFeedback: '締切後の初回提出総括',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(afterSubmitResubmit.status).toBe(403);
   });
 });
 

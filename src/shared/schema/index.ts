@@ -23,6 +23,8 @@ export type PermissionType = z.infer<typeof PermissionTypeSchema>;
 export const CreateAuditionSchema = z.object({
   title: z.string().trim().min(1, 'イベント名を入力してください').max(100),
   eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '開催日はYYYY-MM-DD形式で入力してください'),
+  entryDeadline: z.string().trim().min(1, 'バンド募集締切を入力してください'),
+  scoringDeadline: z.string().trim().nullable().optional(),
   deadline: z.string().nullable().optional(),
   isPenaltyEnabled: z.boolean().optional().default(false),
   aggregationMethod: AggregationMethodSchema.optional().default('DIFF_CORRECTION'),
@@ -32,6 +34,8 @@ export const CreateAuditionSchema = z.object({
 export const UpdateAuditionSchema = z.object({
   title: z.string().trim().min(1).max(100).optional(),
   eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  entryDeadline: z.string().trim().min(1).optional(),
+  scoringDeadline: z.string().trim().nullable().optional(),
   deadline: z.string().nullable().optional(),
   isPenaltyEnabled: z.boolean().optional(),
   aggregationMethod: AggregationMethodSchema.optional(),
@@ -40,6 +44,7 @@ export const UpdateAuditionSchema = z.object({
 
 export const UpdateAuditionStatusSchema = z.object({
   status: AuditionStatusSchema,
+  scoringDeadline: z.string().trim().min(1).optional(),
 });
 
 export const UpsertBandSchema = z.object({

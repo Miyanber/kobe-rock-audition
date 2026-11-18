@@ -6,6 +6,7 @@ import {
   CloudOff,
   Eye,
   FileSpreadsheet,
+  Lock,
   MessageSquareText,
   Music,
   Pencil,
@@ -21,6 +22,10 @@ import { ToastNotification } from '../components/ToastNotification.tsx';
 import { useScoreDrafts } from '../hooks/useScoreDrafts.ts';
 import type { AuditionScoringPayload, AuthUserDto } from '../types.ts';
 import type { AuditionScopedRoute } from '../routes.ts';
+import {
+  formatDeadlineDisplay,
+  isDeadlineExpired,
+} from '../../shared/deadline.ts';
 
 interface ScoringPageProps {
   user: AuthUserDto;
@@ -100,11 +105,26 @@ export function ScoringPage({
   );
 
   const isCommentOnly = voterEntry?.permissionType === 'COMMENT_ONLY';
+  const effectiveScoringDeadline =
+    activeAudition?.scoringDeadline ?? activeAudition?.deadline ?? null;
+  const isScoringExpired = isDeadlineExpired(effectiveScoringDeadline);
+  const serverScoreMap = useMemo(
+    () => new Map((data?.myScores ?? []).map((s) => [s.bandId, s])),
+    [data?.myScores],
+  );
+  const hasServerGeneralFeedback =
+    (voterEntry?.generalFeedback ?? '').trim().length > 0;
+  const isGeneralFeedbackReadOnly =
+    isScoringExpired &&
+    (Boolean(voterEntry?.isSubmitted) || hasServerGeneralFeedback);
+  const isFullyLockedByDeadline =
+    isScoringExpired && Boolean(voterEntry?.isSubmitted);
 
   const completionStatus = useMemo(() => {
     let completedBands = 0;
     for (const band of targetBands) {
-      const d = drafts[band.id];
+      const saved = isScoringExpired ? serverScoreMap.get(band.id) : undefined;
+      const d = saved ?? drafts[band.id];
       if (!d) continue;
       const hasComment = d.comment.trim().length > 0;
       const hasScores = d.techScore !== null && d.charmScore !== null;
@@ -112,7 +132,11 @@ export function ScoringPage({
         completedBands++;
       }
     }
-    const hasGeneralFeedback = generalFeedbackDraft.text.trim().length > 0;
+    const generalText =
+      isGeneralFeedbackReadOnly && hasServerGeneralFeedback
+        ? (voterEntry?.generalFeedback ?? '')
+        : generalFeedbackDraft.text;
+    const hasGeneralFeedback = generalText.trim().length > 0;
     const completedSteps = completedBands + (hasGeneralFeedback ? 1 : 0);
     const totalSteps = targetBands.length + 1;
     return {
@@ -123,7 +147,17 @@ export function ScoringPage({
       totalSteps,
       allDone: completedSteps === totalSteps,
     };
-  }, [targetBands, drafts, generalFeedbackDraft.text, isCommentOnly]);
+  }, [
+    targetBands,
+    drafts,
+    generalFeedbackDraft.text,
+    isCommentOnly,
+    isScoringExpired,
+    serverScoreMap,
+    isGeneralFeedbackReadOnly,
+    hasServerGeneralFeedback,
+    voterEntry?.generalFeedback,
+  ]);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setFeedback({ type, text });
@@ -134,6 +168,10 @@ export function ScoringPage({
 
   const handleSaveSingleBand = async (bandId: string, bandName: string) => {
     if (!activeAudition) return;
+    if (isScoringExpired && (voterEntry?.isSubmitted || serverScoreMap.has(bandId))) {
+      showToast('error', '採点締切を過ぎているため、保存済み・提出済みの採点は変更できません');
+      return;
+    }
     const d = drafts[bandId];
     const comment = (d?.comment ?? '').trim();
     const techScore = isCommentOnly ? null : (d?.techScore ?? null);
@@ -158,11 +196,38 @@ export function ScoringPage({
 
     setSavingBandId(bandId);
     try {
-      await apiJson(`/api/auditions/${activeAudition.id}/scores/${bandId}`, {
+      const res = await apiJson<{
+        ok: boolean;
+        score: {
+          bandId: string;
+          techScore: number | null;
+          charmScore: number | null;
+          comment: string;
+          updatedAt: number;
+        };
+      }>(`/api/auditions/${activeAudition.id}/scores/${bandId}`, {
         method: 'PUT',
         body: JSON.stringify({ techScore, charmScore, comment }),
       });
       markSaved([bandId]);
+      setData((prev) => {
+        if (!prev) return prev;
+        const others = prev.myScores.filter((s) => s.bandId !== bandId);
+        return {
+          ...prev,
+          myScores: [
+            ...others,
+            {
+              id: prev.myScores.find((s) => s.bandId === bandId)?.id ?? bandId,
+              bandId,
+              techScore: res.score.techScore,
+              charmScore: res.score.charmScore,
+              comment: res.score.comment,
+              updatedAt: res.score.updatedAt,
+            },
+          ],
+        };
+      });
       showToast('success', `「${bandName}」の採点を保存しました`);
     } catch (err) {
       showToast(
@@ -176,6 +241,10 @@ export function ScoringPage({
 
   const handleSaveGeneralFeedback = async () => {
     if (!activeAudition) return;
+    if (isGeneralFeedbackReadOnly) {
+      showToast('error', '採点締切を過ぎているため、入力済み・提出済みの全体講評は変更できません');
+      return;
+    }
     const trimmed = generalFeedbackDraft.text.trim();
     if (!trimmed) {
       showToast('error', '全体講評を入力してください');
@@ -197,6 +266,17 @@ export function ScoringPage({
         body: JSON.stringify({ generalFeedback: trimmed }),
       });
       markGeneralFeedbackSaved();
+      setData((prev) =>
+        prev && prev.voterEntry
+          ? {
+              ...prev,
+              voterEntry: {
+                ...prev.voterEntry,
+                generalFeedback: trimmed,
+              },
+            }
+          : prev,
+      );
       showToast('success', '全体講評を保存しました');
     } catch (err) {
       showToast(
@@ -210,6 +290,10 @@ export function ScoringPage({
 
   const handleFinalSubmit = async () => {
     if (!activeAudition) return;
+    if (isFullyLockedByDeadline) {
+      showToast('error', '採点締切を過ぎているため、提出済みの内容は変更できません');
+      return;
+    }
     if (!navigator.onLine) {
       showToast('error', 'オフラインのため送信できません。通信復旧後に再度お試しください。');
       return;
@@ -219,6 +303,15 @@ export function ScoringPage({
     try {
       const payload = {
         scores: targetBands.map((b) => {
+          const saved = serverScoreMap.get(b.id);
+          if (isScoringExpired && saved) {
+            return {
+              bandId: b.id,
+              techScore: isCommentOnly ? null : saved.techScore,
+              charmScore: isCommentOnly ? null : saved.charmScore,
+              comment: saved.comment,
+            };
+          }
           const d = drafts[b.id];
           return {
             bandId: b.id,
@@ -227,7 +320,10 @@ export function ScoringPage({
             comment: d?.comment ?? '',
           };
         }),
-        generalFeedback: generalFeedbackDraft.text,
+        generalFeedback:
+          isScoringExpired && hasServerGeneralFeedback
+            ? voterEntry!.generalFeedback
+            : generalFeedbackDraft.text,
         markSubmitted: true,
       };
       await apiJson(`/api/auditions/${activeAudition.id}/scores/submit`, {
@@ -249,7 +345,8 @@ export function ScoringPage({
   const myPreviewList = useMemo(() => {
     return targetBands
       .map((b) => {
-        const d = drafts[b.id];
+        const saved = isScoringExpired ? serverScoreMap.get(b.id) : undefined;
+        const d = saved ?? drafts[b.id];
         const tech = isCommentOnly ? null : (d?.techScore ?? null);
         const charm = isCommentOnly ? null : (d?.charmScore ?? null);
         const total = tech !== null && charm !== null ? tech + charm : null;
@@ -270,7 +367,7 @@ export function ScoringPage({
         if (b.total !== a.total) return b.total - a.total;
         return a.band.performanceOrder - b.band.performanceOrder;
       });
-  }, [targetBands, drafts, isCommentOnly]);
+  }, [targetBands, drafts, isCommentOnly, isScoringExpired, serverScoreMap]);
 
   if (loading) {
     return (
@@ -420,7 +517,7 @@ export function ScoringPage({
               {voterEntry.isSubmitted ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  提出済・再編集可
+                  {isScoringExpired ? '提出済・締切終了' : '提出済・再編集可'}
                 </span>
               ) : (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -431,9 +528,14 @@ export function ScoringPage({
             <h1 className="text-lg sm:text-xl font-bold text-zinc-800 mt-1.5">
               {activeAudition.title}
             </h1>
-            {activeAudition.deadline && (
-              <p className="text-xs text-zinc-500 mt-0.5">
-                締切: {activeAudition.deadline.replace('T', ' ')}
+            {effectiveScoringDeadline && (
+              <p
+                className={`text-xs mt-0.5 ${
+                  isScoringExpired ? 'font-semibold text-rose-700' : 'text-zinc-500'
+                }`}
+              >
+                採点締切: {formatDeadlineDisplay(effectiveScoringDeadline)}
+                {isScoringExpired ? '（締切超過）' : ''}
               </p>
             )}
           </div>
@@ -512,6 +614,23 @@ export function ScoringPage({
         onClose={feedback ? () => setFeedback(null) : undefined}
       />
 
+      {isScoringExpired && (
+        <div
+          className={`rounded-sm border px-3.5 py-2.5 text-xs sm:text-sm flex items-start gap-2 ${
+            isFullyLockedByDeadline
+              ? 'bg-zinc-100 border-zinc-300 text-zinc-700'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}
+        >
+          <Lock className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            {isFullyLockedByDeadline
+              ? `採点締切（${formatDeadlineDisplay(effectiveScoringDeadline)}）を過ぎているため、提出済みの採点・コメントは変更できません。`
+              : `採点締切（${formatDeadlineDisplay(effectiveScoringDeadline)}）を過ぎています。未入力のバンド・全体講評のみ入力および初回の最終提出が可能です（保存済み項目の修正はできません）。`}
+          </span>
+        </div>
+      )}
+
       {/* タイムテーブル & 採点カード一覧 */}
       <div className="space-y-2.5">
         {data?.bands.map((band) => {
@@ -556,11 +675,28 @@ export function ScoringPage({
             localUpdatedAt: 0,
           };
 
-          const tech = draft.techScore;
-          const charm = draft.charmScore;
+          const serverSaved = serverScoreMap.get(band.id);
+          const isBandReadOnly =
+            isScoringExpired &&
+            (voterEntry.isSubmitted || serverSaved !== undefined);
+          const displayDraft =
+            isBandReadOnly && serverSaved
+              ? {
+                  ...draft,
+                  techScore: serverSaved.techScore,
+                  charmScore: serverSaved.charmScore,
+                  comment: serverSaved.comment,
+                  locked: true,
+                  dirty: false,
+                }
+              : draft;
+          const showLockedView = isBandReadOnly || displayDraft.locked;
+
+          const tech = displayDraft.techScore;
+          const charm = displayDraft.charmScore;
           const total =
             tech !== null && charm !== null ? tech + charm : null;
-          const hasComment = draft.comment.trim().length > 0;
+          const hasComment = displayDraft.comment.trim().length > 0;
           const isCompleted = isCommentOnly
             ? hasComment
             : hasComment && tech !== null && charm !== null;
@@ -569,7 +705,7 @@ export function ScoringPage({
             <div
               key={band.id}
               className={`bg-zinc-50 border rounded-sm p-2.5 sm:p-3.5 transition ${
-                draft.locked
+                showLockedView
                   ? 'border-slate-300 bg-slate-100/80'
                   : isCompleted
                     ? 'border-emerald-300'
@@ -579,7 +715,7 @@ export function ScoringPage({
               {/* カードヘッダー */}
               <div
                 className={`flex items-start justify-between gap-2 ${
-                  draft.locked ? '' : 'pb-2 border-b border-zinc-200'
+                  showLockedView ? '' : 'pb-2 border-b border-zinc-200'
                 }`}
               >
                 <div className="flex items-start gap-2 min-w-0">
@@ -591,7 +727,7 @@ export function ScoringPage({
                       <h3 className="font-bold text-zinc-800 text-sm sm:text-base leading-tight">
                         {band.name}
                       </h3>
-                      {draft.dirty ? (
+                      {displayDraft.dirty ? (
                         <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-amber-50 text-amber-800">
                           未保存の下書き
                         </span>
@@ -613,7 +749,7 @@ export function ScoringPage({
 
                 {/* 合計点(編集時) & 編集ボタン(保存済折りたたみ時) */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {!draft.locked && !isCommentOnly && (
+                  {!showLockedView && !isCommentOnly && (
                     <div className="px-2 py-1 rounded-sm bg-slate-700 text-white text-xs font-bold tabular-nums whitespace-nowrap">
                       合計 {total !== null ? total : '--'}
                       <span className="text-[10px] font-normal text-zinc-300">
@@ -622,22 +758,29 @@ export function ScoringPage({
                     </div>
                   )}
 
-                  {draft.locked && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateDraft(band.id, { locked: false }, false)
-                      }
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap"
-                    >
-                      <Pencil className="h-3 w-3" />
-                      編集
-                    </button>
+                  {isBandReadOnly ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-zinc-200 text-zinc-600 whitespace-nowrap">
+                      <Lock className="h-3 w-3" />
+                      締切後変更不可
+                    </span>
+                  ) : (
+                    showLockedView && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDraft(band.id, { locked: false }, false)
+                        }
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        編集
+                      </button>
+                    )
                   )}
                 </div>
               </div>
 
-              {draft.locked ? (
+              {showLockedView ? (
                 /* 保存済折りたたみ表示（魅力点・技術点・合計点＋小文字コメント） */
                 <div className="mt-2 pt-1.5 border-t border-zinc-200/80 space-y-1.5">
                   {!isCommentOnly && (
@@ -657,7 +800,7 @@ export function ScoringPage({
                     </div>
                   )}
                   <p className="text-[11px] text-zinc-600 leading-snug whitespace-pre-wrap break-words">
-                    {draft.comment.trim() || '（コメント未入力）'}
+                    {displayDraft.comment.trim() || '（コメント未入力）'}
                   </p>
                 </div>
               ) : (
@@ -796,7 +939,7 @@ export function ScoringPage({
         {/* 全体講評（総括）カード */}
         <div
           className={`bg-zinc-50 border rounded-sm p-2.5 sm:p-3.5 transition ${
-            generalFeedbackDraft.locked
+            isGeneralFeedbackReadOnly || generalFeedbackDraft.locked
               ? 'border-slate-300 bg-slate-100/80'
               : completionStatus.hasGeneralFeedback
                 ? 'border-emerald-300'
@@ -805,7 +948,9 @@ export function ScoringPage({
         >
           <div
             className={`flex items-start justify-between gap-2 ${
-              generalFeedbackDraft.locked ? '' : 'pb-2 border-b border-zinc-200'
+              isGeneralFeedbackReadOnly || generalFeedbackDraft.locked
+                ? ''
+                : 'pb-2 border-b border-zinc-200'
             }`}
           >
             <div className="flex items-start gap-2 min-w-0">
@@ -817,7 +962,7 @@ export function ScoringPage({
                   <h3 className="font-bold text-zinc-800 text-sm sm:text-base leading-tight">
                     全体講評
                   </h3>
-                  {generalFeedbackDraft.dirty ? (
+                  {!isGeneralFeedbackReadOnly && generalFeedbackDraft.dirty ? (
                     <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-amber-50 text-amber-800">
                       未保存の下書き
                     </span>
@@ -837,22 +982,31 @@ export function ScoringPage({
               </div>
             </div>
 
-            {generalFeedbackDraft.locked && (
-              <button
-                type="button"
-                onClick={() => updateGeneralFeedback({ locked: false }, false)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <Pencil className="h-3 w-3" />
-                編集
-              </button>
+            {isGeneralFeedbackReadOnly ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-zinc-200 text-zinc-600 whitespace-nowrap shrink-0">
+                <Lock className="h-3 w-3" />
+                締切後変更不可
+              </span>
+            ) : (
+              generalFeedbackDraft.locked && (
+                <button
+                  type="button"
+                  onClick={() => updateGeneralFeedback({ locked: false }, false)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Pencil className="h-3 w-3" />
+                  編集
+                </button>
+              )
             )}
           </div>
 
-          {generalFeedbackDraft.locked ? (
+          {isGeneralFeedbackReadOnly || generalFeedbackDraft.locked ? (
             <div className="mt-2 pt-1.5 border-t border-zinc-200/80">
               <p className="text-[11px] text-zinc-600 leading-snug whitespace-pre-wrap break-words">
-                {generalFeedbackDraft.text.trim() || '（全体講評未入力）'}
+                {(isGeneralFeedbackReadOnly && hasServerGeneralFeedback
+                  ? voterEntry.generalFeedback.trim()
+                  : generalFeedbackDraft.text.trim()) || '（全体講評未入力）'}
               </p>
             </div>
           ) : (
@@ -937,17 +1091,19 @@ export function ScoringPage({
 
             <button
               type="button"
-              disabled={submittingAll}
+              disabled={submittingAll || isFullyLockedByDeadline}
               onClick={handleFinalSubmit}
-              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs sm:text-sm font-bold transition disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-xs sm:text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Send className="h-4 w-4" />
               <span>
                 {submittingAll
                   ? '提出処理中...'
-                  : voterEntry.isSubmitted
-                    ? '内容を更新提出する'
-                    : '最終提出する'}
+                  : isFullyLockedByDeadline
+                    ? '締切終了・提出済'
+                    : voterEntry.isSubmitted
+                      ? '内容を更新提出する'
+                      : '最終提出する'}
               </span>
             </button>
           </div>
@@ -1013,9 +1169,13 @@ export function ScoringPage({
                 <div className="text-xs font-bold text-zinc-800">
                   全体講評
                 </div>
-                {generalFeedbackDraft.text.trim() ? (
+                {(isGeneralFeedbackReadOnly && hasServerGeneralFeedback
+                  ? voterEntry.generalFeedback.trim()
+                  : generalFeedbackDraft.text.trim()) ? (
                   <p className="text-xs text-zinc-700 whitespace-pre-wrap break-words">
-                    {generalFeedbackDraft.text.trim()}
+                    {isGeneralFeedbackReadOnly && hasServerGeneralFeedback
+                      ? voterEntry.generalFeedback.trim()
+                      : generalFeedbackDraft.text.trim()}
                   </p>
                 ) : (
                   <p className="text-xs font-semibold text-rose-600">
@@ -1035,12 +1195,12 @@ export function ScoringPage({
               </button>
               <button
                 type="button"
-                disabled={submittingAll}
+                disabled={submittingAll || isFullyLockedByDeadline}
                 onClick={handleFinalSubmit}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="h-4 w-4" />
-                このまま最終提出する
+                {isFullyLockedByDeadline ? '締切終了・提出済' : 'このまま最終提出する'}
               </button>
             </div>
           </div>

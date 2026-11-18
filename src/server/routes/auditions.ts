@@ -26,7 +26,28 @@ import {
   UpsertScoreSchema,
 } from '../../shared/schema/index.ts';
 import type { AppDb } from '../db/client.ts';
+import { isDeadlineExpired } from '../../shared/deadline.ts';
 import { calculateGrade, isActiveClubGrade } from '../../shared/grade.ts';
+
+function getBandEditBlockedError(
+  audition: typeof auditions.$inferSelect,
+  userRole: string,
+): string | null {
+  if (userRole === 'ADMIN') return null;
+  if (audition.status !== 'DRAFT') {
+    return 'バンド募集期間が終了しているため、一般部員によるバンド登録・編集はロックされています。';
+  }
+  if (isDeadlineExpired(audition.entryDeadline)) {
+    return 'バンド募集締切を過ぎているため、一般部員によるバンド登録・編集はできません。';
+  }
+  return null;
+}
+
+function getEffectiveScoringDeadline(
+  audition: typeof auditions.$inferSelect,
+): string | null {
+  return audition.scoringDeadline ?? audition.deadline;
+}
 
 async function loadAuditionHighlights(db: AppDb) {
   const [activeAudition] = await db
@@ -385,7 +406,10 @@ export const auditionRoutes = new Hono<AppEnv>()
       audition,
       bands: bandsWithMembers,
       ownBandIds,
-      canEditWiki: audition.status === 'DRAFT' || user.role === 'ADMIN',
+      canEditWiki:
+        user.role === 'ADMIN' ||
+        (audition.status === 'DRAFT' &&
+          !isDeadlineExpired(audition.entryDeadline)),
     });
   })
   .post('/:id/bands', zValidator('json', UpsertBandSchema), async (c) => {
@@ -404,11 +428,9 @@ export const auditionRoutes = new Hono<AppEnv>()
       return c.json({ error: 'オーディションが見つかりません。' }, 404);
     }
 
-    if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
-      return c.json(
-        { error: 'バンド募集期間が終了しているため、一般部員によるバンド登録はできません。' },
-        403,
-      );
+    const blockedError = getBandEditBlockedError(audition, user.role);
+    if (blockedError) {
+      return c.json({ error: blockedError }, 403);
     }
 
     let performanceOrder = body.performanceOrder;
@@ -471,11 +493,9 @@ export const auditionRoutes = new Hono<AppEnv>()
       return c.json({ error: 'オーディションが見つかりません。' }, 404);
     }
 
-    if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
-      return c.json(
-        { error: 'バンド募集期間が終了しているため、一般部員によるバンド編集はロックされています。' },
-        403,
-      );
+    const blockedError = getBandEditBlockedError(audition, user.role);
+    if (blockedError) {
+      return c.json({ error: blockedError }, 403);
     }
 
     const [existingBand] = await db
@@ -534,11 +554,9 @@ export const auditionRoutes = new Hono<AppEnv>()
       return c.json({ error: 'オーディションが見つかりません。' }, 404);
     }
 
-    if (audition.status !== 'DRAFT' && user.role !== 'ADMIN') {
-      return c.json(
-        { error: 'バンド募集期間が終了しているため、一般部員によるバンド削除はできません。' },
-        403,
-      );
+    const blockedError = getBandEditBlockedError(audition, user.role);
+    if (blockedError) {
+      return c.json({ error: blockedError }, 403);
     }
 
     await db
@@ -558,7 +576,7 @@ export const auditionRoutes = new Hono<AppEnv>()
     if ('error' in resolved) {
       return c.json({ error: resolved.error }, resolved.status);
     }
-    const { voter } = resolved;
+    const { audition, voter } = resolved;
 
     const [band] = await db
       .select()
@@ -579,6 +597,41 @@ export const auditionRoutes = new Hono<AppEnv>()
 
     if (ownMember) {
       return c.json({ error: '所属バンド（自バンド）に対する採点・コメントは送信できません。' }, 403);
+    }
+
+    const scoringExpired = isDeadlineExpired(
+      getEffectiveScoringDeadline(audition),
+    );
+    if (scoringExpired) {
+      if (voter.isSubmitted) {
+        return c.json(
+          {
+            error:
+              '採点締切を過ぎているため、提出済みの採点・コメントは修正できません。',
+          },
+          403,
+        );
+      }
+      const [existingScore] = await db
+        .select({ id: scores.id })
+        .from(scores)
+        .where(
+          and(
+            eq(scores.auditionId, auditionId),
+            eq(scores.bandId, bandId),
+            eq(scores.evaluatorUserId, user.id),
+          ),
+        )
+        .limit(1);
+      if (existingScore) {
+        return c.json(
+          {
+            error:
+              '採点締切を過ぎているため、保存済みの採点・コメントは修正できません（未入力のバンドのみ入力可能です）。',
+          },
+          403,
+        );
+      }
     }
 
     const commentTrimmed = body.comment.trim();
@@ -645,7 +698,23 @@ export const auditionRoutes = new Hono<AppEnv>()
       if ('error' in resolved) {
         return c.json({ error: resolved.error }, resolved.status);
       }
-      const { voter } = resolved;
+      const { audition, voter } = resolved;
+
+      const scoringExpired = isDeadlineExpired(
+        getEffectiveScoringDeadline(audition),
+      );
+      if (
+        scoringExpired &&
+        (voter.isSubmitted || voter.generalFeedback.trim().length > 0)
+      ) {
+        return c.json(
+          {
+            error:
+              '採点締切を過ぎているため、入力済みの全体講評は修正できません。',
+          },
+          403,
+        );
+      }
 
       const feedbackTrimmed = body.generalFeedback.trim();
       if (!feedbackTrimmed) {
@@ -674,7 +743,19 @@ export const auditionRoutes = new Hono<AppEnv>()
     if ('error' in resolved) {
       return c.json({ error: resolved.error }, resolved.status);
     }
-    const { voter } = resolved;
+    const { audition, voter } = resolved;
+
+    const scoringExpired = isDeadlineExpired(
+      getEffectiveScoringDeadline(audition),
+    );
+    if (scoringExpired && voter.isSubmitted) {
+      return c.json(
+        {
+          error: '採点締切を過ぎているため、提出済みの内容は更新できません。',
+        },
+        403,
+      );
+    }
 
     const bandsWithMembers = await loadBandsWithMembers(db, auditionId);
     const ownBandSet = new Set(
@@ -685,8 +766,38 @@ export const auditionRoutes = new Hono<AppEnv>()
     const targetBands = bandsWithMembers.filter((b) => !ownBandSet.has(b.id));
     const targetBandMap = new Map(targetBands.map((b) => [b.id, b]));
 
-    const now = Date.now();
-    const savedBandIds = new Set<string>();
+    const existingScores = await db
+      .select()
+      .from(scores)
+      .where(
+        and(
+          eq(scores.auditionId, auditionId),
+          eq(scores.evaluatorUserId, user.id),
+        ),
+      );
+    const existingScoreMap = new Map(existingScores.map((s) => [s.bandId, s]));
+
+    if (
+      scoringExpired &&
+      voter.generalFeedback.trim().length > 0 &&
+      body.generalFeedback !== undefined &&
+      body.generalFeedback.trim() !== voter.generalFeedback.trim()
+    ) {
+      return c.json(
+        {
+          error:
+            '採点締切を過ぎているため、保存済みの全体講評は変更できません。',
+        },
+        403,
+      );
+    }
+
+    const itemsToUpsert: Array<{
+      bandId: string;
+      techScore: number | null;
+      charmScore: number | null;
+      comment: string;
+    }> = [];
 
     for (const item of body.scores) {
       if (ownBandSet.has(item.bandId)) {
@@ -725,6 +836,36 @@ export const auditionRoutes = new Hono<AppEnv>()
       const finalCharm =
         voter.permissionType === 'SCORE_AND_COMMENT' ? item.charmScore : null;
 
+      const existingScore = existingScoreMap.get(item.bandId);
+      if (scoringExpired && existingScore) {
+        const sameTech =
+          (existingScore.techScore ?? null) === (finalTech ?? null);
+        const sameCharm =
+          (existingScore.charmScore ?? null) === (finalCharm ?? null);
+        const sameComment = existingScore.comment.trim() === commentTrimmed;
+        if (sameTech && sameCharm && sameComment) {
+          continue;
+        }
+        return c.json(
+          {
+            error: `採点締切を過ぎているため、「${targetBandMap.get(item.bandId)!.name}」の保存済み採点・コメントは変更できません。`,
+          },
+          403,
+        );
+      }
+
+      itemsToUpsert.push({
+        bandId: item.bandId,
+        techScore: finalTech,
+        charmScore: finalCharm,
+        comment: commentTrimmed,
+      });
+    }
+
+    const now = Date.now();
+    const savedBandIds = new Set<string>();
+
+    for (const item of itemsToUpsert) {
       await db
         .insert(scores)
         .values({
@@ -732,18 +873,18 @@ export const auditionRoutes = new Hono<AppEnv>()
           auditionId,
           bandId: item.bandId,
           evaluatorUserId: user.id,
-          techScore: finalTech,
-          charmScore: finalCharm,
-          comment: commentTrimmed,
+          techScore: item.techScore,
+          charmScore: item.charmScore,
+          comment: item.comment,
           createdAt: now,
           updatedAt: now,
         })
         .onConflictDoUpdate({
           target: [scores.auditionId, scores.bandId, scores.evaluatorUserId],
           set: {
-            techScore: finalTech,
-            charmScore: finalCharm,
-            comment: commentTrimmed,
+            techScore: item.techScore,
+            charmScore: item.charmScore,
+            comment: item.comment,
             updatedAt: now,
           },
         });
@@ -811,7 +952,8 @@ export const auditionRoutes = new Hono<AppEnv>()
         .where(eq(auditionVoters.id, voter.id));
     } else if (
       body.generalFeedback !== undefined &&
-      body.generalFeedback.trim().length > 0
+      body.generalFeedback.trim().length > 0 &&
+      !(scoringExpired && voter.generalFeedback.trim().length > 0)
     ) {
       await db
         .update(auditionVoters)

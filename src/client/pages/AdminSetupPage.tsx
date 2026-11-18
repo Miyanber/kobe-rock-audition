@@ -28,6 +28,7 @@ import {
   AUDITION_STATUS_LIST,
   getAuditionStatusLabel,
 } from '../../shared/audition-status.ts';
+import { isDeadlineExpired } from '../../shared/deadline.ts';
 import { calculateGrade, isActiveClubGrade } from '../../shared/grade.ts';
 
 interface AdminSetupPageProps {
@@ -87,12 +88,29 @@ export function AdminSetupPage({
   // 新規オーディション作成モーダル
   const [newTitle, setNewTitle] = useState('');
   const [newEventDate, setNewEventDate] = useState(getTodayDateString);
+  const [newEntryDeadline, setNewEntryDeadline] = useState(
+    () => `${getTodayDateString()}T23:59`,
+  );
+  const [entryDeadlineTouched, setEntryDeadlineTouched] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // 採点受付中への切替モーダル（採点締切必須設定）
+  const [showActivateModal, setShowActivateModal] = useState(false);
+  const [activateScoringDeadline, setActivateScoringDeadline] = useState('');
+  const [activatingStatus, setActivatingStatus] = useState(false);
+
+  // 締切設定編集用ドラフト
+  const [entryDeadlineDraft, setEntryDeadlineDraft] = useState('');
+  const [scoringDeadlineDraft, setScoringDeadlineDraft] = useState('');
+  const [savingDeadlines, setSavingDeadlines] = useState(false);
 
   useEffect(() => {
     if (showCreateModal) {
+      const today = getTodayDateString();
       setNewTitle('');
-      setNewEventDate(getTodayDateString());
+      setNewEventDate(today);
+      setNewEntryDeadline(`${today}T23:59`);
+      setEntryDeadlineTouched(false);
     }
   }, [showCreateModal]);
 
@@ -162,6 +180,15 @@ export function AdminSetupPage({
     setStandardDiffDraft(String(selectedAudition?.standardDiff ?? 100));
   }, [selectedAudition?.id, selectedAudition?.standardDiff]);
 
+  useEffect(() => {
+    setEntryDeadlineDraft(selectedAudition?.entryDeadline ?? '');
+    setScoringDeadlineDraft(selectedAudition?.scoringDeadline ?? '');
+  }, [
+    selectedAudition?.id,
+    selectedAudition?.entryDeadline,
+    selectedAudition?.scoringDeadline,
+  ]);
+
   const handleUpdateStandardDiff = async () => {
     if (!selectedAudition) return;
     const num = Number(standardDiffDraft);
@@ -189,6 +216,7 @@ export function AdminSetupPage({
   useEffect(() => {
     setShowDeleteModal(false);
     setDeleteConfirmInput('');
+    setShowActivateModal(false);
     setActiveSection('setup-status');
     void loadContext();
   }, [selectedAuditionId]);
@@ -356,7 +384,7 @@ export function AdminSetupPage({
 
   const handleCreateAudition = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || !newEntryDeadline.trim()) return;
     setCreating(true);
     try {
       const res = await apiJson<{ audition: AuditionDto }>('/api/admin/auditions', {
@@ -364,7 +392,7 @@ export function AdminSetupPage({
         body: JSON.stringify({
           title: newTitle.trim(),
           eventDate: newEventDate,
-          deadline: null,
+          entryDeadline: newEntryDeadline.trim(),
         }),
       });
       onCloseCreateModal();
@@ -381,12 +409,12 @@ export function AdminSetupPage({
 
   const handleChangeStatus = async (status: AuditionStatus) => {
     if (!selectedAudition) return;
-    if (
-      status === 'ACTIVE' &&
-      !window.confirm(
-        `「${selectedAudition.title}」を「採点受付中」に切り替えますか？\n※現在「採点受付中」になっている他のオーディションは自動的に「採点終了・集計」に変更され、一般部員によるバンド登録・編集はロックされます。`,
-      )
-    ) {
+    if (status === 'ACTIVE') {
+      const defaultScoringDeadline =
+        selectedAudition.scoringDeadline?.trim() ||
+        `${selectedAudition.eventDate}T23:59`;
+      setActivateScoringDeadline(defaultScoringDeadline);
+      setShowActivateModal(true);
       return;
     }
     await apiJson(`/api/admin/auditions/${selectedAudition.id}/status`, {
@@ -395,6 +423,56 @@ export function AdminSetupPage({
     });
     await onAuditionsChanged();
     showToast(`進行ステータスを「${getAuditionStatusLabel(status)}」に切り替えました`);
+  };
+
+  const handleConfirmActivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAudition || !activateScoringDeadline.trim()) return;
+    setActivatingStatus(true);
+    try {
+      await apiJson(`/api/admin/auditions/${selectedAudition.id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({
+          status: 'ACTIVE',
+          scoringDeadline: activateScoringDeadline.trim(),
+        }),
+      });
+      setShowActivateModal(false);
+      await onAuditionsChanged();
+      showToast('進行ステータスを「採点受付中」に切り替えました');
+    } catch (err) {
+      setStatusMessage(
+        err instanceof Error ? err.message : 'ステータスの切り替えに失敗しました',
+      );
+    } finally {
+      setActivatingStatus(false);
+    }
+  };
+
+  const handleSaveDeadlines = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAudition || !entryDeadlineDraft.trim()) {
+      setStatusMessage('バンド募集締切を入力してください。');
+      return;
+    }
+    setSavingDeadlines(true);
+    try {
+      await apiJson(`/api/admin/auditions/${selectedAudition.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          entryDeadline: entryDeadlineDraft.trim(),
+          scoringDeadline: scoringDeadlineDraft.trim() || null,
+        }),
+      });
+      await onAuditionsChanged();
+      showToast('締切設定を更新しました');
+    } catch (err) {
+      setStatusMessage(
+        err instanceof Error ? err.message : '締切設定の更新に失敗しました',
+      );
+    } finally {
+      setSavingDeadlines(false);
+    }
   };
 
   const handleDeleteAudition = async (e: React.FormEvent) => {
@@ -773,6 +851,66 @@ export function AdminSetupPage({
                     );
                   })}
                 </div>
+
+                {/* 締切設定（バンド募集締切・採点締切） */}
+                <form
+                  onSubmit={handleSaveDeadlines}
+                  className="pt-3 border-t border-zinc-200 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
+                >
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="setup-entry-deadline"
+                      className="flex items-center justify-between text-xs font-bold text-zinc-700"
+                    >
+                      <span>
+                        バンド募集締切 <span className="text-rose-500">*</span>
+                      </span>
+                      {isDeadlineExpired(selectedAudition.entryDeadline) && (
+                        <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-sm">
+                          締切超過
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="setup-entry-deadline"
+                      type="datetime-local"
+                      required
+                      value={entryDeadlineDraft}
+                      onChange={(e) => setEntryDeadlineDraft(e.target.value)}
+                      className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="setup-scoring-deadline"
+                      className="flex items-center justify-between text-xs font-bold text-zinc-700"
+                    >
+                      <span>採点締切</span>
+                      {isDeadlineExpired(selectedAudition.scoringDeadline) && (
+                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-sm">
+                          締切超過（未入力のみ可）
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="setup-scoring-deadline"
+                      type="datetime-local"
+                      value={scoringDeadlineDraft}
+                      onChange={(e) => setScoringDeadlineDraft(e.target.value)}
+                      className="w-full rounded-sm border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingDeadlines}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    {savingDeadlines ? '保存中...' : '締切を保存'}
+                  </button>
+                </form>
               </section>
 
               {/* 2. 採点・コメント義務設定 */}
@@ -1491,11 +1629,40 @@ export function AdminSetupPage({
                   type="date"
                   required
                   value={newEventDate}
-                  onChange={(e) => setNewEventDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextDate = e.target.value;
+                    setNewEventDate(nextDate);
+                    if (!entryDeadlineTouched && nextDate) {
+                      setNewEntryDeadline(`${nextDate}T23:59`);
+                    }
+                  }}
                   className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
                 />
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
                   ※年度表示とイベントの並び順に使用します。未確定の場合は目安の日付で構いません。
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="create-entry-deadline"
+                  className="block text-xs font-bold text-zinc-700"
+                >
+                  バンド募集締切 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="create-entry-deadline"
+                  type="datetime-local"
+                  required
+                  value={newEntryDeadline}
+                  onChange={(e) => {
+                    setEntryDeadlineTouched(true);
+                    setNewEntryDeadline(e.target.value);
+                  }}
+                  className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
+                />
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  ※この日時を過ぎると、ステータスが「バンド募集中」でも一般部員によるバンド登録・編集が自動的にロックされます。
                 </p>
               </div>
 
@@ -1514,6 +1681,81 @@ export function AdminSetupPage({
                   className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
                   {creating ? '作成中...' : '作成して募集開始'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showActivateModal && selectedAudition && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="activate-audition-modal-title"
+        >
+          <div className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-sm border border-zinc-300 bg-white p-5 shadow-lg space-y-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <h3
+                  id="activate-audition-modal-title"
+                  className="text-base font-bold text-zinc-800 flex items-center gap-2"
+                >
+                  <Play className="h-4 w-4 text-emerald-600 shrink-0" />
+                  採点受付中へ切り替え：{selectedAudition.title}
+                </h3>
+                <p className="text-xs text-zinc-600 leading-relaxed">
+                  現在「採点受付中」になっている他のオーディションは自動的に「採点終了・集計」に変更され、一般部員によるバンド登録・編集はロックされます。
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={activatingStatus}
+                onClick={() => setShowActivateModal(false)}
+                aria-label="閉じる"
+                className="p-1 rounded-sm text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmActivate} className="space-y-3">
+              <div className="space-y-1">
+                <label
+                  htmlFor="activate-scoring-deadline"
+                  className="block text-xs font-bold text-zinc-700"
+                >
+                  採点締切 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="activate-scoring-deadline"
+                  type="datetime-local"
+                  required
+                  value={activateScoringDeadline}
+                  onChange={(e) => setActivateScoringDeadline(e.target.value)}
+                  className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
+                />
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  ※採点締切を過ぎると、既に保存・提出済みの項目は修正できなくなり、未入力のバンド・全体講評のみ入力可能になります。
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={activatingStatus}
+                  onClick={() => setShowActivateModal(false)}
+                  className="px-3.5 py-2 rounded-sm border border-zinc-300 bg-zinc-50 hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={activatingStatus || !activateScoringDeadline.trim()}
+                  className="px-4 py-2 rounded-sm bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {activatingStatus ? '切替中...' : '採点受付を開始する'}
                 </button>
               </div>
             </form>

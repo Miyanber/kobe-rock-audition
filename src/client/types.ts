@@ -27,6 +27,8 @@ export interface AuditionDto {
   title: string;
   eventDate: string;
   deadline: string | null;
+  entryDeadline: string;
+  scoringDeadline: string | null;
   status: AuditionStatus;
   isPenaltyEnabled: boolean;
   aggregationMethod: AggregationMethod;

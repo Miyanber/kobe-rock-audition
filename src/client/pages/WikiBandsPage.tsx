@@ -18,6 +18,10 @@ import type {
   SelectableUserDto,
 } from '../types.ts';
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
+import {
+  formatDeadlineDisplay,
+  isDeadlineExpired,
+} from '../../shared/deadline.ts';
 
 interface WikiBandsPageProps {
   user: AuthUserDto;
@@ -206,6 +210,8 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
     );
   }
 
+  const isEntryExpired = isDeadlineExpired(audition?.entryDeadline);
+
   return (
     <div className="space-y-5">
       {/* ヘッダー */}
@@ -233,19 +239,34 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-300 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={audition.status} />
             <span className="text-xs text-zinc-500">
               登録バンド数: <strong className="text-zinc-800">{bands.length}</strong> 組
             </span>
+            {audition.entryDeadline && (
+              <span
+                className={`text-xs ${
+                  isEntryExpired
+                    ? 'font-semibold text-rose-700'
+                    : 'text-zinc-500'
+                }`}
+              >
+                募集締切: {formatDeadlineDisplay(audition.entryDeadline)}
+              </span>
+            )}
           </div>
 
-          {audition.status !== 'DRAFT' && (
+          {(audition.status !== 'DRAFT' || isEntryExpired) && (
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-sm">
               <Lock className="h-3.5 w-3.5" />
-              {user.role === 'ADMIN'
-                ? 'バンド募集終了のため閲覧のみ / 管理者権限で編集可'
-                : 'バンド募集終了のため閲覧のみ'}
+              {audition.status !== 'DRAFT'
+                ? user.role === 'ADMIN'
+                  ? 'バンド募集終了のため閲覧のみ / 管理者権限で編集可'
+                  : 'バンド募集終了のため閲覧のみ'
+                : user.role === 'ADMIN'
+                  ? '募集締切超過のため閲覧のみ / 管理者権限で編集可'
+                  : '募集締切超過のため閲覧のみ'}
             </div>
           )}
         </div>
