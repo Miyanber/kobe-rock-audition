@@ -115,6 +115,8 @@ export async function loadAuditionAggregation(
       userId: auditionVoters.userId,
       permissionType: auditionVoters.permissionType,
       isSubmitted: auditionVoters.isSubmitted,
+      submittedAt: auditionVoters.submittedAt,
+      generalFeedback: auditionVoters.generalFeedback,
       userName: users.name,
       email: users.email,
       enrollmentYear: users.enrollmentYear,
@@ -158,6 +160,8 @@ export async function loadAuditionAggregation(
       enrollmentYear: v.enrollmentYear,
       permissionType: v.permissionType,
       isSubmitted: v.isSubmitted,
+      submittedAt: v.submittedAt,
+      generalFeedback: v.generalFeedback,
     })),
     scoreRows,
   );

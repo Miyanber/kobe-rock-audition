@@ -289,10 +289,10 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(currentBody.preparingAudition?.status).toBe('ENTRY_CLOSED');
   });
 
-  it('2種類のExcelファイル（2シート集計＆生データ / バンド別講評シート）が仕様通りのシート構成で生成される', async () => {
+  it('2種類のExcelファイル（集計＆生データ＆全体講評 / バンド別講評＋全体講評）が仕様通りのシート構成で生成される', async () => {
     const adminCookie = await loginAs('u-admin');
 
-    // ファイル1: 集計結果 & Rawデータ (2シート)
+    // ファイル1: 集計結果 & Rawデータ & 全体講評 (3シート)
     const res1 = await app.request(
       '/api/admin/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',
       { headers: { Cookie: adminCookie } },
@@ -302,17 +302,32 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(wb1.SheetNames).toEqual([
       '総合ランキング集計',
       '全採点Rawデータ_補正過程',
+      '全体講評',
     ]);
+    const wb1FeedbackRows = XLSX.utils.sheet_to_json<string[]>(
+      wb1.Sheets['全体講評'],
+      { header: 1 },
+    );
+    expect(wb1FeedbackRows[2]).toEqual([
+      '採点者名',
+      '回生',
+      '権限区分',
+      '提出状況',
+      '提出日時',
+      '全体講評',
+    ]);
+    expect(wb1FeedbackRows.length).toBeGreaterThan(3);
 
-    // ファイル2: バンド別講評シート (4バンド = 4シート)
+    // ファイル2: バンド別講評シート (4バンド + 全体講評 = 5シート)
     const res2 = await app.request(
       '/api/admin/auditions/aud-2026-winter/export?target=band_comments&format=xlsx',
       { headers: { Cookie: adminCookie } },
     );
     expect(res2.status).toBe(200);
     const wb2 = XLSX.read(await res2.arrayBuffer(), { type: 'array' });
-    expect(wb2.SheetNames.length).toBe(4);
+    expect(wb2.SheetNames.length).toBe(5);
     expect(wb2.SheetNames[0]).toContain('01_The Rokko Distortion');
+    expect(wb2.SheetNames[4]).toBe('全体講評');
 
     // バンド別シートのヘッダーに正規化後魅力点・技術点・合計点・コメントが含まれていること
     const firstSheetRows = XLSX.utils.sheet_to_json<string[]>(
@@ -327,6 +342,176 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       '正規化後_合計点',
       'コメント',
     ]);
+
+    const wb2FeedbackRows = XLSX.utils.sheet_to_json<string[]>(
+      wb2.Sheets['全体講評'],
+      { header: 1 },
+    );
+    expect(wb2FeedbackRows[2]).toEqual([
+      '採点者名',
+      '回生',
+      '権限区分',
+      '提出状況',
+      '提出日時',
+      '全体講評',
+    ]);
+
+    // CSV 出力にも全体講評が含まれること
+    const csvRes2 = await app.request(
+      '/api/admin/auditions/aud-2026-winter/export?target=band_comments&format=csv',
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(csvRes2.status).toBe(200);
+    const csvText2 = await csvRes2.text();
+    expect(csvText2).toContain('=== 全体講評 ===');
+  });
+
+  it('全体講評の保存・最終提出時の必須バリデーション・管理画面取得と非公開制御が動作する', async () => {
+    const unregisteredCookie = await loginAs('u-unregistered');
+    const voter2Cookie = await loginAs('u-voter2');
+    const adminCookie = await loginAs('u-admin');
+
+    // 未登録ユーザーは 403
+    const unregRes = await app.request(
+      '/api/auditions/aud-2026-winter/general-feedback',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: unregisteredCookie,
+        },
+        body: JSON.stringify({ generalFeedback: '不正な講評' }),
+      },
+    );
+    expect(unregRes.status).toBe(403);
+
+    // 非ACTIVEオーディションは 403
+    const draftRes = await app.request(
+      '/api/auditions/aud-2027-spring/general-feedback',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({ generalFeedback: '受付期間外' }),
+      },
+    );
+    expect(draftRes.status).toBe(403);
+
+    // 空文字の全体講評単体保存は 400
+    const emptySaveRes = await app.request(
+      '/api/auditions/aud-2026-winter/general-feedback',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({ generalFeedback: '   ' }),
+      },
+    );
+    expect(emptySaveRes.status).toBe(400);
+
+    // u-voter2 (b-win-1所属) が他3バンドを入力済みでも、全体講評が空なら最終提出 400
+    const missingFeedbackSubmitRes = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 40, charmScore: 40, comment: '良い演奏' },
+            { bandId: 'b-win-3', techScore: 38, charmScore: 39, comment: '楽しい' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 43, comment: '圧巻' },
+          ],
+          generalFeedback: '',
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(missingFeedbackSubmitRes.status).toBe(400);
+
+    // 全体講評を記入して最終提出すると 200
+    const feedbackText = '全バンド通して非常に熱量のあるステージでした！';
+    const validSubmitRes = await app.request(
+      '/api/auditions/aud-2026-winter/scores/submit',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({
+          scores: [
+            { bandId: 'b-win-2', techScore: 40, charmScore: 40, comment: '良い演奏' },
+            { bandId: 'b-win-3', techScore: 38, charmScore: 39, comment: '楽しい' },
+            { bandId: 'b-win-4', techScore: 42, charmScore: 43, comment: '圧巻' },
+          ],
+          generalFeedback: feedbackText,
+          markSubmitted: true,
+        }),
+      },
+    );
+    expect(validSubmitRes.status).toBe(200);
+
+    // /current で本人の generalFeedback が取得できること
+    const currentRes = await app.request('/api/auditions/current', {
+      headers: { Cookie: voter2Cookie },
+    });
+    expect(currentRes.status).toBe(200);
+    const currentBody = (await currentRes.json()) as {
+      voterEntry: { generalFeedback: string; isSubmitted: boolean } | null;
+    };
+    expect(currentBody.voterEntry?.isSubmitted).toBe(true);
+    expect(currentBody.voterEntry?.generalFeedback).toBe(feedbackText);
+
+    // PUT /general-feedback での再編集・単体保存が動作すること
+    const updatedFeedbackText = '追記：転換もスムーズで素晴らしかったです。';
+    const putFeedbackRes = await app.request(
+      '/api/auditions/aud-2026-winter/general-feedback',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: voter2Cookie,
+        },
+        body: JSON.stringify({ generalFeedback: updatedFeedbackText }),
+      },
+    );
+    expect(putFeedbackRes.status).toBe(200);
+
+    // 管理画面 (/voters, /results) に反映されること
+    const adminVotersRes = await app.request(
+      '/api/admin/auditions/aud-2026-winter/voters',
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(adminVotersRes.status).toBe(200);
+    const adminVotersBody = (await adminVotersRes.json()) as {
+      voters: Array<{ userId: string; generalFeedback: string }>;
+    };
+    expect(
+      adminVotersBody.voters.find((v) => v.userId === 'u-voter2')?.generalFeedback,
+    ).toBe(updatedFeedbackText);
+
+    const adminResultsRes = await app.request(
+      '/api/admin/auditions/aud-2026-winter/results',
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(adminResultsRes.status).toBe(200);
+    const adminResultsBody = (await adminResultsRes.json()) as {
+      aggregation: {
+        generalFeedbacks: Array<{ userId: string; generalFeedback: string }>;
+      };
+    };
+    expect(
+      adminResultsBody.aggregation.generalFeedbacks.find(
+        (g) => g.userId === 'u-voter2',
+      )?.generalFeedback,
+    ).toBe(updatedFeedbackText);
   });
 
   it('ADMINはオーディションと部員を削除でき、自分自身の削除は拒否される', async () => {

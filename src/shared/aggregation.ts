@@ -23,6 +23,8 @@ export interface AggregationVoterInput {
   enrollmentYear?: number;
   permissionType: PermissionType;
   isSubmitted: boolean;
+  submittedAt?: number | null;
+  generalFeedback?: string;
 }
 
 export interface AggregationScoreInput {
@@ -107,11 +109,22 @@ export interface BandAggregationResult {
   activeFinalScore: number;
 }
 
+export interface GeneralFeedbackRecord {
+  userId: string;
+  userName: string;
+  enrollmentYear?: number;
+  permissionType: PermissionType;
+  isSubmitted: boolean;
+  submittedAt: number | null;
+  generalFeedback: string;
+}
+
 export interface AuditionAggregationOutput {
   audition: AggregationAuditionInput;
   bandResults: BandAggregationResult[];
   evaluatorStats: EvaluatorStats[];
   voteRecords: NormalizedVoteRecord[];
+  generalFeedbacks: GeneralFeedbackRecord[];
 }
 
 export function round4(value: number): number {
@@ -504,11 +517,24 @@ export function calculateAuditionResults(
     a.userName.localeCompare(b.userName, 'ja'),
   );
 
+  const generalFeedbacks: GeneralFeedbackRecord[] = [...voters]
+    .sort((a, b) => a.userName.localeCompare(b.userName, 'ja'))
+    .map((v) => ({
+      userId: v.userId,
+      userName: v.userName,
+      enrollmentYear: v.enrollmentYear,
+      permissionType: v.permissionType,
+      isSubmitted: v.isSubmitted,
+      submittedAt: v.submittedAt ?? null,
+      generalFeedback: v.generalFeedback ?? '',
+    }));
+
   return {
     audition,
     bandResults: unsortedResults,
     evaluatorStats,
     voteRecords,
+    generalFeedbacks,
   };
 }
 

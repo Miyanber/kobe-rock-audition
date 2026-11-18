@@ -15,6 +15,7 @@ import type {
   AdminVoterMonitorDto,
   AuditionDto,
 } from '../types.ts';
+import { calculateGrade } from '../../shared/grade.ts';
 import type { AggregationMethod } from '../../shared/schema/index.ts';
 
 interface AdminDashboardPageProps {
@@ -37,10 +38,11 @@ export function AdminDashboardPage({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComparison, setShowComparison] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ranking' | 'evaluators' | 'voters'>(
-    'ranking',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'ranking' | 'evaluators' | 'voters' | 'generalFeedback'
+  >('ranking');
   const [onlyUnsubmitted, setOnlyUnsubmitted] = useState(false);
+  const [showEmptyFeedbacks, setShowEmptyFeedbacks] = useState(false);
   const [penaltyDrafts, setPenaltyDrafts] = useState<Record<string, string>>({});
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -134,6 +136,15 @@ export function AdminDashboardPage({
   const audition = results?.audition;
   const bandResults = results?.aggregation.bandResults ?? [];
   const evaluatorStats = results?.aggregation.evaluatorStats ?? [];
+  const generalFeedbacks = results?.aggregation.generalFeedbacks ?? [];
+  const enteredFeedbackCount = useMemo(
+    () => generalFeedbacks.filter((g) => g.generalFeedback.trim().length > 0).length,
+    [generalFeedbacks],
+  );
+  const filteredGeneralFeedbacks = useMemo(() => {
+    if (showEmptyFeedbacks) return generalFeedbacks;
+    return generalFeedbacks.filter((g) => g.generalFeedback.trim().length > 0);
+  }, [generalFeedbacks, showEmptyFeedbacks]);
 
   return (
     <div className="space-y-5">
@@ -232,10 +243,10 @@ export function AdminDashboardPage({
               <div className="p-2.5 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-zinc-800">
-                    ① 集計結果＆全Rawデータ（2シート）
+                    ① 集計結果＆全Rawデータ＆全体講評（3シート）
                   </div>
                   <div className="text-[11px] text-zinc-500">
-                    ランキング表 + 審査員別基準値＆計算過程
+                    ランキング表 + 審査員別計算過程 + 全体講評
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -259,10 +270,10 @@ export function AdminDashboardPage({
               <div className="p-2.5 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-zinc-800">
-                    ② バンド別講評シート（各バンド1シート）
+                    ② バンド別講評シート（各バンド＋全体講評）
                   </div>
                   <div className="text-[11px] text-zinc-500">
-                    正規化後点数(魅力/技術/合計) + コメント
+                    正規化後点数(魅力/技術/合計) + コメント + 全体講評シート
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -287,7 +298,7 @@ export function AdminDashboardPage({
       )}
 
       {/* タブナビ */}
-      <div className="flex items-center gap-2 border-b border-zinc-300 pb-2">
+      <div className="flex items-center flex-wrap gap-2 border-b border-zinc-300 pb-2">
         <button
           type="button"
           onClick={() => setActiveTab('ranking')}
@@ -307,6 +318,16 @@ export function AdminDashboardPage({
             }`}
         >
           提出状況 ({votersData?.summary.unsubmittedCount ?? 0}名未提出)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('generalFeedback')}
+          className={`px-4 py-2 rounded-sm text-sm font-bold transition cursor-pointer ${activeTab === 'generalFeedback'
+            ? 'bg-slate-700 text-white'
+            : 'bg-zinc-50 text-zinc-600 border border-zinc-300 hover:bg-zinc-100'
+            }`}
+        >
+          全体講評 ({enteredFeedbackCount})
         </button>
         <button
           type="button"
@@ -565,6 +586,18 @@ export function AdminDashboardPage({
                             (自{v.ownBandCount})
                           </span>
                         )}
+                        <div className="text-[11px] font-sans mt-0.5">
+                          全体講評:{' '}
+                          <span
+                            className={
+                              v.generalFeedback?.trim()
+                                ? 'text-emerald-700 font-semibold'
+                                : 'text-zinc-400'
+                            }
+                          >
+                            {v.generalFeedback?.trim() ? '入力済' : '未入力'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-zinc-500">
                         {v.submittedAt
@@ -583,6 +616,86 @@ export function AdminDashboardPage({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      ) : activeTab === 'generalFeedback' ? (
+        <div className="space-y-4">
+          <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-4 text-sm">
+              <span>
+                全体講評入力済:{' '}
+                <strong className="text-zinc-800">
+                  {enteredFeedbackCount} / {generalFeedbacks.length}名
+                </strong>
+              </span>
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showEmptyFeedbacks}
+                onChange={(e) => setShowEmptyFeedbacks(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+              />
+              未入力者も表示
+            </label>
+          </div>
+
+          <div className="space-y-2.5">
+            {filteredGeneralFeedbacks.map((g) => (
+              <div
+                key={g.userId}
+                className="bg-zinc-50 border border-zinc-300 rounded-sm p-4 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-zinc-800">
+                      {g.userName}
+                    </span>
+                    {g.enrollmentYear !== undefined && (
+                      <span className="text-xs text-zinc-500">
+                        {calculateGrade(g.enrollmentYear)}回生
+                      </span>
+                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded-sm text-[11px] font-semibold ${
+                        g.permissionType === 'SCORE_AND_COMMENT'
+                          ? 'bg-slate-100 text-slate-700'
+                          : 'bg-amber-50 text-amber-800'
+                      }`}
+                    >
+                      {g.permissionType === 'SCORE_AND_COMMENT'
+                        ? '採点＋コメント'
+                        : 'コメントのみ'}
+                    </span>
+                    {g.isSubmitted ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-emerald-50 text-emerald-800">
+                        <CheckCircle2 className="h-3 w-3" />
+                        提出済
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-800">
+                        <Clock className="h-3 w-3" />
+                        未提出
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-zinc-400">
+                    {g.submittedAt
+                      ? new Date(g.submittedAt).toLocaleString('ja-JP')
+                      : '-'}
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap break-words">
+                  {g.generalFeedback.trim() || '（未入力）'}
+                </p>
+              </div>
+            ))}
+            {filteredGeneralFeedbacks.length === 0 && (
+              <div className="bg-zinc-50 border border-zinc-300 rounded-sm p-8 text-center text-sm text-zinc-500">
+                入力済みの全体講評はまだありません
+              </div>
+            )}
           </div>
         </div>
       ) : (

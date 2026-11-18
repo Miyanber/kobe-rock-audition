@@ -3,6 +3,7 @@ import {
   round2,
   type AuditionAggregationOutput,
 } from '../../shared/aggregation.ts';
+import { calculateGrade } from '../../shared/grade.ts';
 import type { AggregationMethod } from '../../shared/schema/index.ts';
 
 function methodLabel(method: AggregationMethod): string {
@@ -201,7 +202,56 @@ export function buildSummaryAndRawSheets(
 }
 
 /**
- * ファイル1: 集計結果＆生データブック（Excel 2シート構成 or CSV）を生成
+ * 全体講評（総括）シートのデータ配列と列幅設定を構築
+ */
+export function buildGeneralFeedbackRows(
+  auditionTitle: string,
+  result: AuditionAggregationOutput,
+): (string | number)[][] {
+  const feedbacks = result.generalFeedbacks ?? [];
+  const entered = feedbacks.filter((g) => g.generalFeedback.trim().length > 0);
+
+  const rows: (string | number)[][] = [
+    [
+      `開催回: ${auditionTitle}`,
+      `全体講評入力数: ${entered.length} / ${feedbacks.length}名`,
+    ],
+    [],
+    ['採点者名', '回生', '権限区分', '提出状況', '提出日時', '全体講評'],
+  ];
+
+  if (entered.length === 0) {
+    rows.push(['（全体講評データはまだありません）', '-', '-', '-', '-', '']);
+    return rows;
+  }
+
+  for (const g of entered) {
+    rows.push([
+      g.userName,
+      g.enrollmentYear !== undefined ? `${calculateGrade(g.enrollmentYear)}回生` : '-',
+      g.permissionType === 'SCORE_AND_COMMENT' ? '採点＋コメント' : 'コメントのみ',
+      g.isSubmitted ? '提出済' : '下書き保存',
+      g.submittedAt
+        ? new Date(g.submittedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+        : '-',
+      g.generalFeedback,
+    ]);
+  }
+
+  return rows;
+}
+
+const GENERAL_FEEDBACK_COL_WIDTHS = [
+  { wch: 24 },
+  { wch: 10 },
+  { wch: 16 },
+  { wch: 12 },
+  { wch: 20 },
+  { wch: 72 },
+];
+
+/**
+ * ファイル1: 集計結果＆生データブック（Excel 3シート構成 or CSV）を生成
  */
 export function generateSummaryAndRawExport(
   auditionTitle: string,
@@ -214,6 +264,7 @@ export function generateSummaryAndRawExport(
     eventDate,
     result,
   );
+  const generalFeedbackRows = buildGeneralFeedbackRows(auditionTitle, result);
   const safeTitle = auditionTitle.replace(/[\\/:*?"<>|]/g, '_');
 
   if (format === 'csv') {
@@ -223,6 +274,9 @@ export function generateSummaryAndRawExport(
       [],
       ['=== シート2: 全採点Rawデータ＆補正計算過程 ==='],
       ...rawRows,
+      [],
+      ['=== シート3: 全体講評 ==='],
+      ...generalFeedbackRows,
     ];
     return {
       data: aoaToUtf8BomCsv(combined),
@@ -234,6 +288,7 @@ export function generateSummaryAndRawExport(
   const wb = XLSX.utils.book_new();
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
   const wsRaw = XLSX.utils.aoa_to_sheet(rawRows);
+  const wsGeneralFeedback = XLSX.utils.aoa_to_sheet(generalFeedbackRows);
 
   wsSummary['!cols'] = [
     { wch: 10 },
@@ -274,9 +329,11 @@ export function generateSummaryAndRawExport(
     { wch: 10 },
     { wch: 48 },
   ];
+  wsGeneralFeedback['!cols'] = GENERAL_FEEDBACK_COL_WIDTHS;
 
   XLSX.utils.book_append_sheet(wb, wsSummary, '総合ランキング集計');
   XLSX.utils.book_append_sheet(wb, wsRaw, '全採点Rawデータ_補正過程');
+  XLSX.utils.book_append_sheet(wb, wsGeneralFeedback, '全体講評');
 
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   return {
@@ -288,7 +345,7 @@ export function generateSummaryAndRawExport(
 }
 
 /**
- * ファイル2: バンド別講評コメントブック（各バンドごと1シート構成 or CSV）を生成
+ * ファイル2: バンド別講評コメントブック（各バンドごと1シート＋全体講評シート構成 or CSV）を生成
  * 各シートには採点者の対象バンドに対する正規化後点数（魅力点, 技術点, 合計点）とコメントを掲載する。
  */
 export function generateBandCommentsExport(
@@ -300,6 +357,7 @@ export function generateBandCommentsExport(
   const orderedBands = [...result.bandResults].sort(
     (a, b) => a.performanceOrder - b.performanceOrder,
   );
+  const generalFeedbackRows = buildGeneralFeedbackRows(auditionTitle, result);
 
   if (format === 'csv') {
     const csvRows: (string | number)[][] = [
@@ -334,6 +392,9 @@ export function generateBandCommentsExport(
         ]);
       }
     }
+    csvRows.push([]);
+    csvRows.push(['=== 全体講評 ===']);
+    csvRows.push(...generalFeedbackRows);
     return {
       data: aoaToUtf8BomCsv(csvRows),
       contentType: 'text/csv; charset=utf-8',
@@ -347,7 +408,8 @@ export function generateBandCommentsExport(
 
   if (orderedBands.length === 0) {
     const emptySheet = XLSX.utils.aoa_to_sheet([['登録されているバンドがありません']]);
-    XLSX.utils.book_append_sheet(wb, emptySheet, 'バンドなし');
+    const emptyName = sanitizeExcelSheetName('バンドなし', usedSheetNames);
+    XLSX.utils.book_append_sheet(wb, emptySheet, emptyName);
   }
 
   for (const band of orderedBands) {
@@ -410,6 +472,11 @@ export function generateBandCommentsExport(
     ];
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
+
+  const wsGeneralFeedback = XLSX.utils.aoa_to_sheet(generalFeedbackRows);
+  wsGeneralFeedback['!cols'] = GENERAL_FEEDBACK_COL_WIDTHS;
+  const generalSheetName = sanitizeExcelSheetName('全体講評', usedSheetNames);
+  XLSX.utils.book_append_sheet(wb, wsGeneralFeedback, generalSheetName);
 
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   return {
