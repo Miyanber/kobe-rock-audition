@@ -64,6 +64,7 @@ export interface VoterEntryDto {
   permissionType: PermissionType;
   isSubmitted: boolean;
   submittedAt: number | null;
+  generalFeedback: string;
 }
 
 export interface MyScoreDto {
@@ -120,6 +121,7 @@ export interface AdminVoterMonitorDto {
   permissionType: PermissionType;
   isSubmitted: boolean;
   submittedAt: number | null;
+  generalFeedback: string;
   name: string;
   email: string;
   enrollmentYear: number;

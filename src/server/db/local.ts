@@ -66,7 +66,8 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       permission_type TEXT NOT NULL DEFAULT 'SCORE_AND_COMMENT',
       is_submitted INTEGER NOT NULL DEFAULT 0,
-      submitted_at INTEGER
+      submitted_at INTEGER,
+      general_feedback TEXT NOT NULL DEFAULT ''
     );
     CREATE UNIQUE INDEX IF NOT EXISTS uq_audition_voters_audition_user ON audition_voters(audition_id, user_id);
 
@@ -85,6 +86,15 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_scores_audition_evaluator ON scores(audition_id, evaluator_user_id);
     CREATE INDEX IF NOT EXISTS idx_scores_audition_band ON scores(audition_id, band_id);
   `);
+
+  const voterCols = sqlite
+    .prepare(`PRAGMA table_info(audition_voters)`)
+    .all() as Array<{ name: string }>;
+  if (!voterCols.some((col) => col.name === 'general_feedback')) {
+    sqlite.exec(
+      `ALTER TABLE audition_voters ADD COLUMN general_feedback TEXT NOT NULL DEFAULT '';`,
+    );
+  }
 }
 
 export async function getLocalDb(dbPath: string = '.local-dev.sqlite'): Promise<AppDb> {

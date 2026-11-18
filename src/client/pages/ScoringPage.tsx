@@ -6,6 +6,7 @@ import {
   CloudOff,
   Eye,
   FileSpreadsheet,
+  MessageSquareText,
   Music,
   Pencil,
   RefreshCw,
@@ -36,6 +37,7 @@ export function ScoringPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingBandId, setSavingBandId] = useState<string | null>(null);
+  const [savingGeneralFeedback, setSavingGeneralFeedback] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
@@ -70,14 +72,22 @@ export function ScoringPage({
 
   const {
     drafts,
+    generalFeedbackDraft,
     updateDraft,
+    updateGeneralFeedback,
     markSaved,
+    markGeneralFeedbackSaved,
     syncPendingDrafts,
     isOnline,
     isSyncing,
     dirtyCount,
     syncMessage,
-  } = useScoreDrafts(activeAudition?.id, user.id, data?.myScores ?? []);
+  } = useScoreDrafts(
+    activeAudition?.id,
+    user.id,
+    data?.myScores ?? [],
+    voterEntry?.generalFeedback ?? '',
+  );
 
   const ownBandSet = useMemo(
     () => new Set(data?.ownBandIds ?? []),
@@ -92,22 +102,28 @@ export function ScoringPage({
   const isCommentOnly = voterEntry?.permissionType === 'COMMENT_ONLY';
 
   const completionStatus = useMemo(() => {
-    let completed = 0;
+    let completedBands = 0;
     for (const band of targetBands) {
       const d = drafts[band.id];
       if (!d) continue;
       const hasComment = d.comment.trim().length > 0;
       const hasScores = d.techScore !== null && d.charmScore !== null;
       if (isCommentOnly ? hasComment : hasComment && hasScores) {
-        completed++;
+        completedBands++;
       }
     }
+    const hasGeneralFeedback = generalFeedbackDraft.text.trim().length > 0;
+    const completedSteps = completedBands + (hasGeneralFeedback ? 1 : 0);
+    const totalSteps = targetBands.length + 1;
     return {
-      completed,
-      total: targetBands.length,
-      allDone: targetBands.length > 0 && completed === targetBands.length,
+      completedBands,
+      totalBands: targetBands.length,
+      hasGeneralFeedback,
+      completedSteps,
+      totalSteps,
+      allDone: completedSteps === totalSteps,
     };
-  }, [targetBands, drafts, isCommentOnly]);
+  }, [targetBands, drafts, generalFeedbackDraft.text, isCommentOnly]);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setFeedback({ type, text });
@@ -158,6 +174,40 @@ export function ScoringPage({
     }
   };
 
+  const handleSaveGeneralFeedback = async () => {
+    if (!activeAudition) return;
+    const trimmed = generalFeedbackDraft.text.trim();
+    if (!trimmed) {
+      showToast('error', '全体講評（総括）を入力してください');
+      return;
+    }
+
+    if (!navigator.onLine) {
+      showToast(
+        'error',
+        '現在オフラインのため端末内に下書き保存しました。通信復旧後に自動送信されます。',
+      );
+      return;
+    }
+
+    setSavingGeneralFeedback(true);
+    try {
+      await apiJson(`/api/auditions/${activeAudition.id}/general-feedback`, {
+        method: 'PUT',
+        body: JSON.stringify({ generalFeedback: trimmed }),
+      });
+      markGeneralFeedbackSaved();
+      showToast('success', '全体講評（総括）を保存しました');
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : '保存に失敗しました（下書きは保持されています）',
+      );
+    } finally {
+      setSavingGeneralFeedback(false);
+    }
+  };
+
   const handleFinalSubmit = async () => {
     if (!activeAudition) return;
     if (!navigator.onLine) {
@@ -177,6 +227,7 @@ export function ScoringPage({
             comment: d?.comment ?? '',
           };
         }),
+        generalFeedback: generalFeedbackDraft.text,
         markSubmitted: true,
       };
       await apiJson(`/api/auditions/${activeAudition.id}/scores/submit`, {
@@ -184,9 +235,10 @@ export function ScoringPage({
         body: JSON.stringify(payload),
       });
       markSaved(targetBands.map((b) => b.id));
+      markGeneralFeedbackSaved();
       await loadScoring();
       setShowPreviewModal(false);
-      showToast('success', '全対象バンドの採点・コメントを提出完了しました！');
+      showToast('success', '全対象バンドの採点・全体講評を提出完了しました！');
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : '最終提出に失敗しました');
     } finally {
@@ -423,12 +475,13 @@ export function ScoringPage({
 
         {/* 進捗バー */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
+          <div className="flex items-center justify-between gap-2 flex-wrap text-xs font-medium text-zinc-600">
             <span>
-              対象バンド入力進捗（自バンド {ownBandSet.size} 組除外済み）
+              入力進捗（自バンド {ownBandSet.size} 組除外・全体講評含む）
             </span>
             <span className="font-bold text-zinc-800">
-              {completionStatus.completed} / {completionStatus.total} バンド完了
+              バンド {completionStatus.completedBands} / {completionStatus.totalBands} ・ 全体講評{' '}
+              {completionStatus.hasGeneralFeedback ? '済' : '未'}
             </span>
           </div>
           <div className="w-full h-2.5 bg-zinc-100 rounded-sm overflow-hidden">
@@ -436,8 +489,8 @@ export function ScoringPage({
               className="h-full bg-slate-700 transition-all duration-300"
               style={{
                 width: `${
-                  completionStatus.total > 0
-                    ? Math.round((completionStatus.completed / completionStatus.total) * 100)
+                  completionStatus.totalSteps > 0
+                    ? Math.round((completionStatus.completedSteps / completionStatus.totalSteps) * 100)
                     : 0
                 }%`,
               }}
@@ -739,6 +792,110 @@ export function ScoringPage({
             </div>
           );
         })}
+
+        {/* 全体講評（総括）カード */}
+        <div
+          className={`bg-zinc-50 border rounded-sm p-2.5 sm:p-3.5 transition ${
+            generalFeedbackDraft.locked
+              ? 'border-slate-300 bg-slate-100/80'
+              : completionStatus.hasGeneralFeedback
+                ? 'border-emerald-300'
+                : 'border-zinc-300'
+          }`}
+        >
+          <div
+            className={`flex items-start justify-between gap-2 ${
+              generalFeedbackDraft.locked ? '' : 'pb-2 border-b border-zinc-200'
+            }`}
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-sm bg-slate-700 text-white shrink-0 mt-0.5">
+                <MessageSquareText className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-bold text-zinc-800 text-sm sm:text-base leading-tight">
+                    全体講評（総括）
+                  </h3>
+                  {generalFeedbackDraft.dirty ? (
+                    <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-amber-50 text-amber-800">
+                      未保存の下書き
+                    </span>
+                  ) : completionStatus.hasGeneralFeedback ? (
+                    <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-emerald-50 text-emerald-800">
+                      保存済
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold bg-zinc-100 text-zinc-600">
+                      未入力
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
+                  全バンドを通した総括・オーディション全体の感想を記入してください
+                </p>
+              </div>
+            </div>
+
+            {generalFeedbackDraft.locked && (
+              <button
+                type="button"
+                onClick={() => updateGeneralFeedback({ locked: false }, false)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-[11px] font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <Pencil className="h-3 w-3" />
+                編集
+              </button>
+            )}
+          </div>
+
+          {generalFeedbackDraft.locked ? (
+            <div className="mt-2 pt-1.5 border-t border-zinc-200/80">
+              <p className="text-[11px] text-zinc-600 leading-snug whitespace-pre-wrap break-words">
+                {generalFeedbackDraft.text.trim() || '（全体講評未入力）'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1 pt-2">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="general-feedback-input"
+                    className="text-xs font-bold text-zinc-800"
+                  >
+                    全体講評 <span className="text-rose-500">*必須</span>
+                  </label>
+                  <span className="text-[11px] text-zinc-400">
+                    {generalFeedbackDraft.text.length} / 4000 文字
+                  </span>
+                </div>
+                <textarea
+                  id="general-feedback-input"
+                  rows={4}
+                  maxLength={4000}
+                  value={generalFeedbackDraft.text}
+                  onChange={(e) =>
+                    updateGeneralFeedback({ text: e.target.value })
+                  }
+                  placeholder="オーディション全体を通した総括・良かった点・今後の課題などを入力..."
+                  className="w-full rounded-sm border border-zinc-300 px-2.5 py-1.5 text-sm leading-snug focus:border-slate-700 focus:outline-none focus:ring-0"
+                />
+              </div>
+
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={savingGeneralFeedback}
+                  onClick={handleSaveGeneralFeedback}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {savingGeneralFeedback ? '保存中...' : '講評を保存'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 下部固定アクションバー */}
@@ -747,7 +904,19 @@ export function ScoringPage({
           <div className="text-xs sm:text-sm text-zinc-700 font-medium">
             完了:{' '}
             <span className="font-bold text-slate-700">
-              {completionStatus.completed}/{completionStatus.total}
+              {completionStatus.completedBands}/{completionStatus.totalBands}
+            </span>
+            <span className="ml-1.5 text-xs">
+              ・講評
+              <strong
+                className={
+                  completionStatus.hasGeneralFeedback
+                    ? 'text-emerald-700 ml-0.5'
+                    : 'text-rose-600 ml-0.5'
+                }
+              >
+                {completionStatus.hasGeneralFeedback ? '済' : '未'}
+              </strong>
             </span>
             {dirtyCount > 0 && (
               <span className="ml-2 text-amber-600 font-semibold">
@@ -839,6 +1008,21 @@ export function ScoringPage({
                   )}
                 </div>
               ))}
+
+              <div className="border border-zinc-300 bg-zinc-100/70 rounded-sm p-3 space-y-1">
+                <div className="text-xs font-bold text-zinc-800">
+                  全体講評（総括）
+                </div>
+                {generalFeedbackDraft.text.trim() ? (
+                  <p className="text-xs text-zinc-700 whitespace-pre-wrap break-words">
+                    {generalFeedbackDraft.text.trim()}
+                  </p>
+                ) : (
+                  <p className="text-xs font-semibold text-rose-600">
+                    （未入力 — 最終提出には全体講評の入力が必要です）
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="px-5 py-3.5 border-t border-zinc-300 bg-zinc-100 flex items-center justify-end gap-2">

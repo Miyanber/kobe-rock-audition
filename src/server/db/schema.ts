@@ -112,6 +112,7 @@ export const auditionVoters = sqliteTable(
       .notNull()
       .default(false),
     submittedAt: integer('submitted_at'),
+    generalFeedback: text('general_feedback').notNull().default(''),
   },
   (table) => [
     uniqueIndex('uq_audition_voters_audition_user').on(

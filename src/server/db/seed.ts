@@ -223,14 +223,14 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
   ]);
 
   await db.insert(auditionVoters).values([
-    { id: 'av-1', auditionId: 'aud-2026-winter', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
-    { id: 'av-2', auditionId: 'aud-2026-winter', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null },
-    { id: 'av-3', auditionId: 'aud-2026-winter', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
-    { id: 'av-4', auditionId: 'aud-2026-winter', userId: 'u-voter2', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null },
-    { id: 'av-5', auditionId: 'aud-2026-winter', userId: 'u-comment', permissionType: 'COMMENT_ONLY', isSubmitted: true, submittedAt: now },
-    { id: 'av-6', auditionId: 'aud-2026-summer', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
-    { id: 'av-7', auditionId: 'aud-2026-summer', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
-    { id: 'av-8', auditionId: 'aud-2026-summer', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now },
+    { id: 'av-1', auditionId: 'aud-2026-winter', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now, generalFeedback: '全体的にリズム隊のレベルが一段上がっていて、聴き応えのある冬オーディションでした。本番に向けて転換の段取りも詰めていきましょう！' },
+    { id: 'av-2', auditionId: 'aud-2026-winter', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null, generalFeedback: '' },
+    { id: 'av-3', auditionId: 'aud-2026-winter', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now, generalFeedback: 'どのバンドも選曲の個性が出ていて楽しかったです。音作りにこだわっているバンドが多くて刺激を受けました。' },
+    { id: 'av-4', auditionId: 'aud-2026-winter', userId: 'u-voter2', permissionType: 'SCORE_AND_COMMENT', isSubmitted: false, submittedAt: null, generalFeedback: '' },
+    { id: 'av-5', auditionId: 'aud-2026-winter', userId: 'u-comment', permissionType: 'COMMENT_ONLY', isSubmitted: true, submittedAt: now, generalFeedback: '先輩たちの演奏を間近で聴けてとても勉強になりました！自分も次のライブに出られるよう練習頑張ります。' },
+    { id: 'av-6', auditionId: 'aud-2026-summer', userId: 'u-admin', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now, generalFeedback: '夏ライブらしい勢いのあるステージが多く、会場全体の盛り上がりが素晴らしかったです。' },
+    { id: 'av-7', auditionId: 'aud-2026-summer', userId: 'u-voter1', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now, generalFeedback: '完成度の高いバンドが多く僅差でした。MCやステージングの工夫も印象的でした。' },
+    { id: 'av-8', auditionId: 'aud-2026-summer', userId: 'u-multi', permissionType: 'SCORE_AND_COMMENT', isSubmitted: true, submittedAt: now, generalFeedback: '各バンドの個性がしっかり出ていて良いオーディションでした。お疲れ様でした！' },
   ]);
 
   await db.insert(scores).values([

@@ -62,6 +62,10 @@ export const UpsertScoreSchema = z.object({
   comment: z.string().max(2000),
 });
 
+export const UpsertGeneralFeedbackSchema = z.object({
+  generalFeedback: z.string().max(4000),
+});
+
 export const SubmitScoresSchema = z.object({
   scores: z.array(
     z.object({
@@ -71,6 +75,7 @@ export const SubmitScoresSchema = z.object({
       comment: z.string().max(2000),
     }),
   ),
+  generalFeedback: z.string().max(4000).optional(),
   markSubmitted: z.boolean().default(true),
 });
 

@@ -282,6 +282,20 @@ function splitTotalScore(
   };
 }
 
+const FRESHMAN_GENERAL_FEEDBACKS = [
+  '先輩方の迫力ある演奏をたくさん聴けて、とても勉強になりました！次のライブに向けて自分も頑張ります。',
+  'どのバンドも個性がはっきりしていて、長時間でも最後まで楽しく聴けました。お疲れ様でした！',
+  'ステージ上での魅せ方やMCの盛り上げ方がすごく参考になりました。',
+];
+
+const GENERAL_FEEDBACKS = [
+  '全体的に演奏の安定感が高く、どのバンドも本番が楽しみになる完成度でした。お疲れ様でした！',
+  'バンドごとのカラーがはっきり出ていて聴き応えがありました。音量バランスや転換も意識できると更に良くなると思います。',
+  '回生を問わずチャレンジングな選曲やアレンジが多く、とても刺激的なオーディションでした！',
+  'リズム隊のグルーヴがしっかりしているバンドが上位に来ている印象でした。本番に向けて細部を詰めていきましょう。',
+  'ライブ感や観客を巻き込む力のあるバンドが多くて楽しかったです。長時間の審査・演奏お疲れ様でした！',
+];
+
 function pickComment(total: number, rand: () => number): string {
   if (total >= 80) {
     return HIGH_SCORE_COMMENTS[Math.floor(rand() * HIGH_SCORE_COMMENTS.length)];
@@ -629,6 +643,9 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       permissionType: 'SCORE_AND_COMMENT',
       isSubmitted: v.submitted,
       submittedAt: v.submitted ? now - Math.floor(rand() * 3600_000) : null,
+      generalFeedback: v.submitted
+        ? GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)]
+        : '',
     });
   }
   for (const v of winterCommentVoters) {
@@ -639,6 +656,9 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       permissionType: 'COMMENT_ONLY',
       isSubmitted: v.submitted,
       submittedAt: v.submitted ? now - Math.floor(rand() * 3600_000) : null,
+      generalFeedback: v.submitted
+        ? FRESHMAN_GENERAL_FEEDBACKS[Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)]
+        : '',
     });
   }
 
@@ -707,6 +727,8 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       permissionType: 'SCORE_AND_COMMENT',
       isSubmitted: true,
       submittedAt: now - 86_400_000 * 90,
+      generalFeedback:
+        GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)],
     });
 
     const voterBias = (rand() - 0.5) * 14;
@@ -744,6 +766,10 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       permissionType: 'COMMENT_ONLY',
       isSubmitted: true,
       submittedAt: now - 86_400_000 * 90,
+      generalFeedback:
+        FRESHMAN_GENERAL_FEEDBACKS[
+          Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)
+        ],
     });
 
     for (let bIdx = 0; bIdx < SUMMER_BANDS.length; bIdx++) {

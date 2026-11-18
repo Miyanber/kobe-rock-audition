@@ -440,6 +440,7 @@ export const adminRoutes = new Hono<AppEnv>()
         permissionType: auditionVoters.permissionType,
         isSubmitted: auditionVoters.isSubmitted,
         submittedAt: auditionVoters.submittedAt,
+        generalFeedback: auditionVoters.generalFeedback,
         name: users.name,
         email: users.email,
         enrollmentYear: users.enrollmentYear,

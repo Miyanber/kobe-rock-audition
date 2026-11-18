@@ -18,10 +18,11 @@ import {
 import {
   SubmitScoresSchema,
   UpsertBandSchema,
+  UpsertGeneralFeedbackSchema,
   UpsertScoreSchema,
 } from '../../shared/schema/index.ts';
-import { calculateGrade } from '../../shared/grade.ts';
 import type { AppDb } from '../db/client.ts';
+import { calculateGrade } from '../../shared/grade.ts';
 
 async function loadAuditionHighlights(db: AppDb) {
   const [activeAudition] = await db
@@ -100,6 +101,48 @@ async function loadUserScoringContext(db: AppDb, userId: string, auditionId: str
     ownBandIds,
     myScores,
   };
+}
+
+async function resolveActiveVoter(
+  db: AppDb,
+  auditionId: string,
+  userId: string,
+) {
+  const [audition] = await db
+    .select()
+    .from(auditions)
+    .where(eq(auditions.id, auditionId))
+    .limit(1);
+
+  if (!audition) {
+    return { error: 'オーディションが見つかりません。', status: 404 as const };
+  }
+  if (audition.status !== 'ACTIVE') {
+    return {
+      error: '現在このオーディションは採点受付期間中ではありません。',
+      status: 403 as const,
+    };
+  }
+
+  const [voter] = await db
+    .select()
+    .from(auditionVoters)
+    .where(
+      and(
+        eq(auditionVoters.auditionId, auditionId),
+        eq(auditionVoters.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!voter) {
+    return {
+      error: 'このオーディションの採点・コメント対象者に登録されていません。',
+      status: 403 as const,
+    };
+  }
+
+  return { audition, voter };
 }
 
 export const auditionRoutes = new Hono<AppEnv>()
@@ -445,33 +488,11 @@ export const auditionRoutes = new Hono<AppEnv>()
     const bandId = c.req.param('bandId');
     const body = c.req.valid('json');
 
-    const [audition] = await db
-      .select()
-      .from(auditions)
-      .where(eq(auditions.id, auditionId))
-      .limit(1);
-
-    if (!audition) {
-      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    const resolved = await resolveActiveVoter(db, auditionId, user.id);
+    if ('error' in resolved) {
+      return c.json({ error: resolved.error }, resolved.status);
     }
-    if (audition.status !== 'ACTIVE') {
-      return c.json({ error: '現在このオーディションは採点受付期間中ではありません。' }, 403);
-    }
-
-    const [voter] = await db
-      .select()
-      .from(auditionVoters)
-      .where(
-        and(
-          eq(auditionVoters.auditionId, auditionId),
-          eq(auditionVoters.userId, user.id),
-        ),
-      )
-      .limit(1);
-
-    if (!voter) {
-      return c.json({ error: 'このオーディションの採点・コメント対象者に登録されていません。' }, 403);
-    }
+    const { voter } = resolved;
 
     const [band] = await db
       .select()
@@ -545,39 +566,49 @@ export const auditionRoutes = new Hono<AppEnv>()
       },
     });
   })
+  .put(
+    '/:id/general-feedback',
+    zValidator('json', UpsertGeneralFeedbackSchema),
+    async (c) => {
+      const db = c.get('db');
+      const user = c.get('user')!;
+      const auditionId = c.req.param('id');
+      const body = c.req.valid('json');
+
+      const resolved = await resolveActiveVoter(db, auditionId, user.id);
+      if ('error' in resolved) {
+        return c.json({ error: resolved.error }, resolved.status);
+      }
+      const { voter } = resolved;
+
+      const feedbackTrimmed = body.generalFeedback.trim();
+      if (!feedbackTrimmed) {
+        return c.json({ error: '全体講評（総括）を入力してください。' }, 400);
+      }
+
+      await db
+        .update(auditionVoters)
+        .set({ generalFeedback: feedbackTrimmed })
+        .where(eq(auditionVoters.id, voter.id));
+
+      return c.json({
+        ok: true,
+        generalFeedback: feedbackTrimmed,
+        updatedAt: Date.now(),
+      });
+    },
+  )
   .post('/:id/scores/submit', zValidator('json', SubmitScoresSchema), async (c) => {
     const db = c.get('db');
     const user = c.get('user')!;
     const auditionId = c.req.param('id');
     const body = c.req.valid('json');
 
-    const [audition] = await db
-      .select()
-      .from(auditions)
-      .where(eq(auditions.id, auditionId))
-      .limit(1);
-
-    if (!audition) {
-      return c.json({ error: 'オーディションが見つかりません。' }, 404);
+    const resolved = await resolveActiveVoter(db, auditionId, user.id);
+    if ('error' in resolved) {
+      return c.json({ error: resolved.error }, resolved.status);
     }
-    if (audition.status !== 'ACTIVE') {
-      return c.json({ error: '現在このオーディションは採点受付期間中ではありません。' }, 403);
-    }
-
-    const [voter] = await db
-      .select()
-      .from(auditionVoters)
-      .where(
-        and(
-          eq(auditionVoters.auditionId, auditionId),
-          eq(auditionVoters.userId, user.id),
-        ),
-      )
-      .limit(1);
-
-    if (!voter) {
-      return c.json({ error: 'このオーディションの採点・コメント対象者に登録されていません。' }, 403);
-    }
+    const { voter } = resolved;
 
     const bandsWithMembers = await loadBandsWithMembers(db, auditionId);
     const ownBandSet = new Set(
@@ -690,12 +721,35 @@ export const auditionRoutes = new Hono<AppEnv>()
         );
       }
 
+      const finalGeneralFeedback =
+        body.generalFeedback !== undefined
+          ? body.generalFeedback.trim()
+          : voter.generalFeedback.trim();
+
+      if (!finalGeneralFeedback) {
+        return c.json(
+          {
+            error: '全体講評（総括）が未入力です。入力してから最終提出してください。',
+          },
+          400,
+        );
+      }
+
       await db
         .update(auditionVoters)
         .set({
+          generalFeedback: finalGeneralFeedback,
           isSubmitted: true,
           submittedAt: now,
         })
+        .where(eq(auditionVoters.id, voter.id));
+    } else if (
+      body.generalFeedback !== undefined &&
+      body.generalFeedback.trim().length > 0
+    ) {
+      await db
+        .update(auditionVoters)
+        .set({ generalFeedback: body.generalFeedback.trim() })
         .where(eq(auditionVoters.id, voter.id));
     }
 
