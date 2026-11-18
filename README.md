@@ -36,7 +36,8 @@
 │   │   ├── db/
 │   │   │   ├── schema.ts        # Drizzle ORM テーブル定義 (6テーブル)
 │   │   │   ├── local.ts         # ローカル SQLite アダプタ (自動テーブル作成)
-│   │   │   └── seed.ts          # 初期デモデータシード
+│   │   │   ├── seed.ts          # 初期デモデータシード
+│   │   │   └── seed-data.ts     # テストデータ定義（架空部員＋採点分布データ）
 │   │   ├── lib/
 │   │   │   ├── csv.ts           # CSV/TSV パーサー
 │   │   │   ├── export.ts        # 2ファイルExcel/CSV生成ロジック
@@ -71,7 +72,13 @@ npm run dev
 ```
 ブラウザで `http://localhost:5173` を開くと、ログイン画面の「開発・検証用ダミーログイン」から運営委員長（ADMIN）・掛け持ち部員・一般部員・コメントのみ部員等をワンクリックで切り替えて全機能を試せます。
 
-### 4. テスト・型チェック・ビルド
+### 4. テストデータの共有・リセット（別PCでの再現手順）
+ローカル開発用のテストデータは [src/server/db/seed-data.ts](./src/server/db/seed-data.ts) としてリポジトリに含まれています。
+- **プライバシー・セキュリティ**: 部員名・メールアドレスはすべて架空のダミーデータ（1〜3回生）で構成されており、**実名や個人のメールアドレスは含まれていません**（採点分布のみ実測モデルを使用）。
+- **別PCでの利用方法**: 他の PC で `git clone`（または `git pull`）後に `npm install` → `npm run dev` を実行すると、`.local-dev.sqlite` が自動生成され同じテストデータが即座に投入されます（`.local-dev.sqlite` 本体は `.gitignore` 対象です）。
+- **テストデータの再生成**: すでに古い `.local-dev.sqlite` がある環境で最新のテストデータへ入れ替える場合は、`.local-dev.sqlite` を削除して `npm run dev` を再起動してください。
+
+### 5. テスト・型チェック・ビルド
 ```bash
 npm test       # Vitest（集計ロジック単体テスト＋API/RBAC/Excel結合テスト）
 npm run build  # Vite 本番ビルド + TypeScript 型チェック
