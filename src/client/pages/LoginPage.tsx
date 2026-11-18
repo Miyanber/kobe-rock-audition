@@ -5,7 +5,6 @@ import type { AuthMeResponse, AuthUserDto } from '../types.ts';
 
 interface DevUserItem {
   id: string;
-  email: string;
   name: string;
   role: 'ADMIN' | 'VOTER';
   enrollmentYear: number;
@@ -130,12 +129,9 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
                             {u.name}
                           </span>
                           <span className="text-xs text-zinc-500">
-                            ({u.grade}回生)
+                            {u.grade}回生
                           </span>
                         </div>
-                        <p className="text-xs text-zinc-500 font-mono truncate">
-                          {u.email}
-                        </p>
                       </div>
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold shrink-0 ${

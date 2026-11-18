@@ -38,7 +38,6 @@ export interface AuditionDto {
 export interface BandMemberDto {
   userId: string;
   name: string;
-  email: string;
   enrollmentYear: number;
   grade: number;
   instrument: string | null;
@@ -110,9 +109,19 @@ export interface VoterBandRankingDto {
   activeFinalScore: number;
 }
 
+export interface VoterGeneralFeedbackDto {
+  userId: string;
+  userName: string;
+  grade?: number;
+  permissionType: PermissionType;
+  submittedAt: number | null;
+  generalFeedback: string;
+}
+
 export interface VoterResultsResponse {
   audition: AuditionDto;
   rankings: VoterBandRankingDto[];
+  generalFeedbacks?: VoterGeneralFeedbackDto[];
 }
 
 export interface AdminVoterMonitorDto {
@@ -141,7 +150,7 @@ export interface AdminResultsResponse {
 export interface SelectableUserDto {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   enrollmentYear: number;
   grade: number;
   role?: Role;
