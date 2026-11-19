@@ -1468,6 +1468,7 @@ export function AdminSetupPage({
                     </ul>
                   </div>
                 )}
+                </div>
               </section>
 
               {/* 5. 詳細設定・削除 */}
