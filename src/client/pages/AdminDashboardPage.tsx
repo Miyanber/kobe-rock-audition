@@ -348,7 +348,9 @@ export function AdminDashboardPage({
                 <strong className="text-emerald-700">{requiredSubmittedCount}名</strong> が提出済み、
                 <strong className="text-rose-700">{requiredUnsubmittedCount}名</strong> が未提出です。
                 <br />
-                未提出者が 0名になると、一般画面および管理画面のランキングが自動的に表示されます。
+                {audition?.status === 'CLOSED'
+                  ? '未提出者が 0名になると、管理画面および一般画面のランキングが表示されます。'
+                  : '未提出者が 0名になると管理画面のランキングが表示されます（一般画面への公開には進行ステータスを「4. 採点終了・集計」に切り替える必要があります）。'}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
