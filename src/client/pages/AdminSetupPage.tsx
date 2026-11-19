@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { ToastNotification } from '../components/ToastNotification.tsx';
+import { ToggleSwitch } from '../components/ToggleSwitch.tsx';
 import type {
   AdminVoterMonitorDto,
   AuditionDto,
@@ -1424,7 +1425,6 @@ export function AdminSetupPage({
                     </ul>
                   </div>
                 )}
-                </div>
               </section>
 
               {/* 5. 詳細設定・削除 */}
@@ -1460,15 +1460,13 @@ export function AdminSetupPage({
                           {oldAuditionCount > 0 && `（対象イベント: ${oldAuditionCount}件）`}
                         </p>
                       </div>
-                      <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-zinc-300 bg-zinc-50 text-xs font-bold text-zinc-800 cursor-pointer shrink-0 select-none">
-                        <input
-                          type="checkbox"
+                      <div className="shrink-0">
+                        <ToggleSwitch
                           checked={showOldAuditions}
-                          onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
-                          className="h-4 w-4 rounded border-zinc-300 text-slate-700"
+                          onChange={onToggleShowOldAuditions}
+                          label="半年以上前のイベントを表示"
                         />
-                        <span>{showOldAuditions ? '表示中' : '非表示'}</span>
-                      </label>
+                      </div>
                     </div>
                   )}
 
