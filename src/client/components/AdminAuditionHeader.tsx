@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ArrowRight, Music, Radio } from 'lucide-react';
+import { ToggleSwitch } from './ToggleSwitch.tsx';
 import {
   AUDITION_STATUS_META,
   getAuditionStatusLabel,
@@ -117,18 +118,12 @@ export function AdminAuditionHeader({
           </p>
           {(oldAuditionCount > 0 || showOldAuditions) &&
             onToggleShowOldAuditions && (
-              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-700 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showOldAuditions}
-                  onChange={(e) => onToggleShowOldAuditions(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-zinc-300 text-slate-700"
-                />
-                <span>
-                  半年以上前のイベントを表示
-                  {oldAuditionCount > 0 ? ` (${oldAuditionCount}件)` : ''}
-                </span>
-              </label>
+              <ToggleSwitch
+                checked={showOldAuditions}
+                onChange={onToggleShowOldAuditions}
+                size="sm"
+                label={`半年以上前のイベントを表示${oldAuditionCount > 0 ? ` (${oldAuditionCount}件)` : ''}`}
+              />
             )}
         </div>
       </div>

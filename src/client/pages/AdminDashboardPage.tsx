@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { ToastNotification } from '../components/ToastNotification.tsx';
+import { ToggleSwitch } from '../components/ToggleSwitch.tsx';
 import type {
   AdminResultsResponse,
   AdminVoterMonitorDto,
@@ -474,28 +475,22 @@ export function AdminDashboardPage({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-300">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={audition.isPenaltyEnabled}
-                  onChange={(e) =>
-                    handleUpdateSettings({ isPenaltyEnabled: e.target.checked })
-                  }
-                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                />
-                ペナルティ減点を有効化
-              </label>
+            <div className="flex flex-wrap items-center gap-4">
+              <ToggleSwitch
+                checked={audition.isPenaltyEnabled}
+                onChange={(checked) =>
+                  handleUpdateSettings({ isPenaltyEnabled: checked })
+                }
+                size="sm"
+                label="ペナルティ減点を有効化"
+              />
 
-              <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showComparison}
-                  onChange={(e) => setShowComparison(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                />
-                3方式比較列
-              </label>
+              <ToggleSwitch
+                checked={showComparison}
+                onChange={setShowComparison}
+                size="sm"
+                label="3方式比較列"
+              />
             </div>
           </div>
         </div>
@@ -1035,16 +1030,13 @@ export function AdminDashboardPage({
               </span>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={onlyUnsubmitted}
-                  onChange={(e) => setOnlyUnsubmitted(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-                />
-                未提出者のみ表示
-              </label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <ToggleSwitch
+                checked={onlyUnsubmitted}
+                onChange={setOnlyUnsubmitted}
+                size="sm"
+                label="未提出者のみ表示"
+              />
 
               <button
                 type="button"
@@ -1155,15 +1147,12 @@ export function AdminDashboardPage({
               </span>
             </div>
 
-            <label className="inline-flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showEmptyFeedbacks}
-                onChange={(e) => setShowEmptyFeedbacks(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-300 text-slate-700"
-              />
-              未入力者も表示
-            </label>
+            <ToggleSwitch
+              checked={showEmptyFeedbacks}
+              onChange={setShowEmptyFeedbacks}
+              size="sm"
+              label="未入力者も表示"
+            />
           </div>
 
           <div className="space-y-2.5">
