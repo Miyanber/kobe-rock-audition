@@ -864,7 +864,7 @@ export function AdminDashboardPage({
                       {(!isResultsHiddenByDefault || forceShowResults) && (
                         <span className="px-2 py-1 rounded-sm bg-slate-700 text-white font-bold">
                           平均 魅力 {round2(band.activeAvgNormCharm).toFixed(2)} / 技術{' '}
-                          {round2(band.activeAvgNormTech).toFixed(2)} / 最終{' '}
+                          {round2(band.activeAvgNormTech).toFixed(2)} / 合計{' '}
                           {round2(band.activeFinalScore).toFixed(2)}
                         </span>
                       )}
@@ -877,19 +877,22 @@ export function AdminDashboardPage({
                     </div>
                   ) : (
                     <div className="overflow-x-auto bg-white">
+                      <div className="px-3 py-1.5 bg-zinc-50/70 border-b border-zinc-200 text-[11px] text-zinc-500">
+                        ※点数は正規化後のものを表示しています。
+                      </div>
                       <table className="w-full text-left border-collapse text-xs sm:text-sm">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-600 font-bold">
                             <th className="px-3 py-2.5 whitespace-nowrap">採点者名</th>
                             <th className="px-3 py-2.5 whitespace-nowrap">権限区分</th>
                             <th className="px-3 py-2.5 text-right whitespace-nowrap">
-                              正規化後_魅力点
+                              魅力点
                             </th>
                             <th className="px-3 py-2.5 text-right whitespace-nowrap">
-                              正規化後_技術点
+                              技術点
                             </th>
                             <th className="px-3 py-2.5 text-right whitespace-nowrap">
-                              正規化後_合計点
+                              合計点
                             </th>
                             <th className="px-3 py-2.5 min-w-[260px]">コメント</th>
                           </tr>

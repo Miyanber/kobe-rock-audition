@@ -455,7 +455,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       status: 'CLOSED',
       isPenaltyEnabled: true,
       aggregationMethod: 'DIFF_CORRECTION',
-      standardDiff: 10.0,
+      standardDiff: 100.0,
       createdAt: now,
       updatedAt: now,
     },
