@@ -1,7 +1,32 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import fs from 'node:fs';
 import path from 'node:path';
+
+function loadDevVars(filePath: string): Record<string, string> {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  const env: Record<string, string> = {};
+  const content = fs.readFileSync(filePath, 'utf8');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eqIndex = line.indexOf('=');
+    if (eqIndex <= 0) continue;
+    const key = line.slice(0, eqIndex).trim();
+    let value = line.slice(eqIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+    ) {
+      value = value.slice(1, -1);
+    }
+    env[key] = value;
+  }
+  return env;
+}
 
 function honoDevApiPlugin(): Plugin {
   return {
@@ -46,7 +71,8 @@ function honoDevApiPlugin(): Plugin {
             body: body ? new Uint8Array(body) : undefined,
           });
 
-          const webResponse: Response = await honoApp.fetch(webRequest);
+          const devVars = loadDevVars(path.resolve(__dirname, '.dev.vars'));
+          const webResponse: Response = await honoApp.fetch(webRequest, devVars);
 
           res.statusCode = webResponse.status;
           webResponse.headers.forEach((value, key) => {
