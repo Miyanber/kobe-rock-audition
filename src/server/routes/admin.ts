@@ -88,14 +88,16 @@ export const adminRoutes = new Hono<AppEnv>()
     }
     const now = Date.now();
     const id = await generateUniqueAuditionId(db);
+    const normalizedScoringDeadline = body.scoringDeadline?.trim() || null;
 
     await db.insert(auditions).values({
       id,
       title: body.title,
       eventDate: body.eventDate,
       entryDeadline: body.entryDeadline,
-      scoringDeadline: body.scoringDeadline ?? null,
-      deadline: body.scoringDeadline ?? body.entryDeadline ?? body.deadline ?? null,
+      scoringDeadline: normalizedScoringDeadline,
+      deadline:
+        normalizedScoringDeadline ?? body.entryDeadline ?? body.deadline ?? null,
       status: 'DRAFT',
       isPenaltyEnabled: body.isPenaltyEnabled,
       aggregationMethod: body.aggregationMethod,
