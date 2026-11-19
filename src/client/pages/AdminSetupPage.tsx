@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -850,6 +851,14 @@ export function AdminSetupPage({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   {AUDITION_STATUS_LIST.map((meta) => {
                     const isSelected = selectedAudition.status === meta.status;
+                    const isDraftLockedByDeadline =
+                      isSelected &&
+                      meta.status === 'DRAFT' &&
+                      isDeadlineExpired(selectedAudition.entryDeadline);
+                    const isActiveRestrictedByDeadline =
+                      isSelected &&
+                      meta.status === 'ACTIVE' &&
+                      isDeadlineExpired(selectedAudition.scoringDeadline);
                     return (
                       <button
                         key={meta.status}
@@ -861,9 +870,21 @@ export function AdminSetupPage({
                             : 'bg-zinc-100 hover:bg-zinc-200/70 text-zinc-800 border-zinc-300'
                         }`}
                       >
-                        <span className="text-sm font-bold">
-                          {meta.step}. {meta.label}
-                        </span>
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <span className="text-sm font-bold">
+                            {meta.step}. {meta.label}
+                          </span>
+                          {isDraftLockedByDeadline && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-rose-500/20 text-rose-200 border border-rose-300/40">
+                              締切超過・自動ロック中
+                            </span>
+                          )}
+                          {isActiveRestrictedByDeadline && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-200 border border-amber-300/40">
+                              締切超過・未入力のみ可
+                            </span>
+                          )}
+                        </div>
                         <span
                           className={`text-[11px] leading-snug ${
                             isSelected ? 'text-slate-200' : 'text-zinc-500'
@@ -875,6 +896,28 @@ export function AdminSetupPage({
                     );
                   })}
                 </div>
+
+                {selectedAudition.status === 'DRAFT' &&
+                  isDeadlineExpired(selectedAudition.entryDeadline) && (
+                    <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-sm px-3.5 py-2.5 text-xs flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed">
+                        <strong>募集締切を過ぎているため、一般部員のバンド登録・編集は自動ロック中です</strong>
+                        （実態は「2. 募集締切・調整中」と同じ状態です）。登録を再開したい場合は、下のバンド募集締切を未来の日時に変更してください。
+                      </p>
+                    </div>
+                  )}
+
+                {selectedAudition.status === 'ACTIVE' &&
+                  isDeadlineExpired(selectedAudition.scoringDeadline) && (
+                    <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-sm px-3.5 py-2.5 text-xs flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed">
+                        <strong>採点締切を過ぎているため、入力・提出済みの項目は編集ロック中です</strong>
+                        （未入力のバンド・全体講評のみ入力できます）。完全に採点を締め切る場合は「4. 採点終了・集計」へ切り替えてください。
+                      </p>
+                    </div>
+                  )}
 
                 {/* 締切設定（バンド募集締切・採点締切） */}
                 <form
@@ -1807,6 +1850,14 @@ export function AdminSetupPage({
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
                   ※採点締切を過ぎると、既に保存・提出済みの項目は修正できなくなり、未入力のバンド・全体講評のみ入力可能になります。
                 </p>
+                {isDeadlineExpired(activateScoringDeadline) && (
+                  <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-sm px-3 py-2 text-xs flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      設定されている採点締切はすでに過去の日時です。このまま切り替えると、開始直後から「締切超過（未入力のみ可）」の状態になります。
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
