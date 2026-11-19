@@ -1299,27 +1299,30 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     const multiCookie = await loginAs('u-multi');
     const voter2Cookie = await loginAs('u-voter2');
 
-    // 1) buildRealisticSeedData() の六甲祭 (aud-2026-winter) に未提出者が0であること
+    // 1) buildRealisticSeedData() が全4ステータスを網羅し、六甲祭 (aud-2026-rokkosai) に未提出者が0であること
     const realistic = buildRealisticSeedData();
-    const winterVoters = realistic.auditionVoters.filter(
-      (v) => v.auditionId === 'aud-2026-winter',
+    expect(new Set(realistic.auditions.map((a) => a.status))).toEqual(
+      new Set(['CLOSED', 'ACTIVE', 'ENTRY_CLOSED', 'DRAFT']),
     );
-    expect(winterVoters.length).toBeGreaterThan(0);
-    expect(winterVoters.filter((v) => !v.isSubmitted)).toHaveLength(0);
+    const rokkosaiVoters = realistic.auditionVoters.filter(
+      (v) => v.auditionId === 'aud-2026-rokkosai',
+    );
+    expect(rokkosaiVoters.length).toBeGreaterThan(0);
+    expect(rokkosaiVoters.filter((v) => !v.isSubmitted)).toHaveLength(0);
     // 自バンドへのスコアが含まれていないことも検証
-    const winterMembersByBand = new Map<string, Set<string>>();
+    const rokkosaiMembersByBand = new Map<string, Set<string>>();
     for (const bm of realistic.bandMembers) {
-      if (!bm.bandId.startsWith('b-win-')) continue;
-      const set = winterMembersByBand.get(bm.bandId) ?? new Set<string>();
+      if (!bm.bandId.startsWith('b-rok-')) continue;
+      const set = rokkosaiMembersByBand.get(bm.bandId) ?? new Set<string>();
       set.add(bm.userId);
-      winterMembersByBand.set(bm.bandId, set);
+      rokkosaiMembersByBand.set(bm.bandId, set);
     }
-    const winterScores = realistic.scores.filter(
-      (s) => s.auditionId === 'aud-2026-winter',
+    const rokkosaiScores = realistic.scores.filter(
+      (s) => s.auditionId === 'aud-2026-rokkosai',
     );
     expect(
-      winterScores.some((s) =>
-        winterMembersByBand.get(s.bandId)?.has(s.evaluatorUserId),
+      rokkosaiScores.some((s) =>
+        rokkosaiMembersByBand.get(s.bandId)?.has(s.evaluatorUserId),
       ),
     ).toBe(false);
 

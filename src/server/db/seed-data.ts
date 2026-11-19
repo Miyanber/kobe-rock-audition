@@ -23,8 +23,8 @@ export interface RealisticSeedData {
   scores: NewScore[];
 }
 
-// 32 bands in performance order modeled on ROCK採点集計 改 2026ver Miyanber.xlsx
-const WINTER_BANDS: Array<{ name: string; penalty: number; techBias: number }> = [
+// 32 bands in performance order modeled on 六甲祭 Excel data
+const ROKKOSAI_BANDS: Array<{ name: string; penalty: number; techBias: number }> = [
   { name: 'カネヨリマサル', penalty: 0, techBias: 0.47 },
   { name: 'きのこ帝国', penalty: 0, techBias: 0.48 },
   { name: 'Bruno Mars', penalty: 0, techBias: 0.53 },
@@ -132,9 +132,7 @@ const EXCEL_SCORE_MATRIX: Array<Array<number | null>> = [
   [62,62,73,80,68,57,72,58,60,95,79,null,83,67,63,69,91,81,71,77,64,93,65,85,83,89,75,null,64,60,70,84],
 ];
 
-const SUMMER_BANDS: Array<{ name: string; penalty: number; baseMean: number; techBias: number }> = [
-  { name: 'Summer Breeze Band', penalty: 0, baseMean: 74, techBias: 0.50 },
-  { name: 'Nankinmachi Funk', penalty: 0, baseMean: 77, techBias: 0.53 },
+const WINTER_EVENT_BANDS: Array<{ name: string; penalty: number; baseMean: number; techBias: number }> = [
   { name: 'サカナクション', penalty: 0, baseMean: 80, techBias: 0.52 },
   { name: 'フジファブリック', penalty: 0, baseMean: 72, techBias: 0.51 },
   { name: 'Base Ball Bear', penalty: 0, baseMean: 69, techBias: 0.50 },
@@ -142,21 +140,26 @@ const SUMMER_BANDS: Array<{ name: string; penalty: number; baseMean: number; tec
   { name: 'UNISON SQUARE GARDEN', penalty: 0, baseMean: 82, techBias: 0.55 },
   { name: 'go!go!vanillas', penalty: 0, baseMean: 73, techBias: 0.48 },
   { name: 'NUMBER GIRL', penalty: 1.0, baseMean: 75, techBias: 0.52 },
-  { name: 'スーパーカー', penalty: 0, baseMean: 65, techBias: 0.49 },
   { name: '凛として時雨', penalty: 0, baseMean: 78, techBias: 0.57 },
-  { name: 'KANA-BOON', penalty: 0, baseMean: 67, techBias: 0.48 },
   { name: 'フレデリック', penalty: 0, baseMean: 74, techBias: 0.49 },
-  { name: 'ヤバイTシャツ屋さん', penalty: 0, baseMean: 72, techBias: 0.45 },
   { name: 'マカロニえんぴつ', penalty: 0, baseMean: 76, techBias: 0.49 },
-  { name: 'Mrs. GREEN APPLE', penalty: 0, baseMean: 79, techBias: 0.52 },
   { name: 'King Gnu', penalty: 0, baseMean: 83, techBias: 0.54 },
   { name: 'Official髭男dism', penalty: 0, baseMean: 81, techBias: 0.53 },
-  { name: 'BUMP OF CHICKEN', penalty: 0, baseMean: 73, techBias: 0.48 },
-  { name: '椎名林檎', penalty: 0, baseMean: 78, techBias: 0.52 },
   { name: 'THE ORAL CIGARETTES', penalty: 2.0, baseMean: 71, techBias: 0.49 },
-  { name: 'BLUE ENCOUNT', penalty: 0, baseMean: 68, techBias: 0.48 },
-  { name: 'SHISHAMO', penalty: 0, baseMean: 70, techBias: 0.49 },
   { name: 'ハヌマーン', penalty: 0, baseMean: 76, techBias: 0.54 },
+];
+
+const MINI_NBRF_BANDS = [
+  'Nankinmachi Funk',
+  'Summer Breeze Band',
+  'スーパーカー',
+  'KANA-BOON',
+  'ヤバイTシャツ屋さん',
+  'Mrs. GREEN APPLE',
+  'BUMP OF CHICKEN',
+  '椎名林檎',
+  'BLUE ENCOUNT',
+  'SHISHAMO',
 ];
 
 const SPRING_DRAFT_BANDS = [
@@ -398,14 +401,14 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   }
 
-  // 2. Auditions
+  // 2. Auditions (All 4 statuses: CLOSED, ACTIVE, ENTRY_CLOSED, DRAFT)
   const auditionList: NewAudition[] = [
     {
       id: 'aud-2027-spring',
-      title: '新歓ライブ',
-      eventDate: '2027-04-15',
-      deadline: '2027-04-10T23:59',
-      entryDeadline: '2027-04-10T23:59',
+      title: '春一発ライブ',
+      eventDate: '2027-04-10',
+      deadline: '2027-04-03T23:59',
+      entryDeadline: '2027-04-03T23:59',
       scoringDeadline: null,
       status: 'DRAFT',
       isPenaltyEnabled: true,
@@ -415,12 +418,26 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       updatedAt: now,
     },
     {
-      id: 'aud-2026-winter',
-      title: '六甲祭',
-      eventDate: '2026-12-20',
-      deadline: '2026-12-20T23:59',
-      entryDeadline: '2026-12-10T23:59',
-      scoringDeadline: '2026-12-20T23:59',
+      id: 'aud-2027-nbrf',
+      title: 'mini-NBRF',
+      eventDate: '2027-01-30',
+      deadline: '2027-01-30T23:59',
+      entryDeadline: '2027-01-22T23:59',
+      scoringDeadline: '2027-01-30T23:59',
+      status: 'ENTRY_CLOSED',
+      isPenaltyEnabled: true,
+      aggregationMethod: 'DIFF_CORRECTION',
+      standardDiff: 100.0,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'aud-2027-winter',
+      title: '冬イベ',
+      eventDate: '2027-01-18',
+      deadline: '2027-01-18T23:59',
+      entryDeadline: '2027-01-10T23:59',
+      scoringDeadline: '2027-01-18T23:59',
       status: 'ACTIVE',
       isPenaltyEnabled: true,
       aggregationMethod: 'DIFF_CORRECTION',
@@ -429,16 +446,16 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
       updatedAt: now,
     },
     {
-      id: 'aud-2026-summer',
-      title: '夏ライブ',
-      eventDate: '2026-08-10',
-      deadline: '2026-08-10T23:59',
-      entryDeadline: '2026-08-05T23:59',
-      scoringDeadline: '2026-08-10T23:59',
+      id: 'aud-2026-rokkosai',
+      title: '六甲祭',
+      eventDate: '2026-10-03',
+      deadline: '2026-10-03T23:59',
+      entryDeadline: '2026-09-25T23:59',
+      scoringDeadline: '2026-10-03T23:59',
       status: 'CLOSED',
       isPenaltyEnabled: true,
       aggregationMethod: 'DIFF_CORRECTION',
-      standardDiff: 100.0,
+      standardDiff: 10.0,
       createdAt: now,
       updatedAt: now,
     },
@@ -468,14 +485,14 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     return true;
   };
 
-  // 3a. Winter bands (32 bands)
-  WINTER_BANDS.forEach((b, idx) => {
-    const bandId = `b-win-${idx + 1}`;
+  // 3a. 六甲祭 bands (32 bands, CLOSED)
+  ROKKOSAI_BANDS.forEach((b, idx) => {
+    const bandId = `b-rok-${idx + 1}`;
     const updater = userList[idx % 20].id;
-    const bandTime = now - (WINTER_BANDS.length - idx) * 60_000;
+    const bandTime = now - 86_400_000 * 47 - (ROKKOSAI_BANDS.length - idx) * 60_000;
     bandList.push({
       id: bandId,
-      auditionId: 'aud-2026-winter',
+      auditionId: 'aud-2026-rokkosai',
       name: b.name,
       performanceOrder: idx + 1,
       penaltyDeduction: b.penalty,
@@ -485,22 +502,15 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   });
 
-  // Fixed demo self-band assignments aligned with null cells in EXCEL_SCORE_MATRIX
-  addMember('b-win-1', 'u-multi', 'Gt/Vo');
-  addMember('b-win-1', 'u-voter2', 'Dr');
-  addMember('b-win-2', 'u-voter1', 'Ba');
-  addMember('b-win-9', 'u-multi', 'Gt');
-  addMember('b-win-4', 'u-admin', 'Vo');
-
   // Map all 69 Excel rows to submitted SCORE_AND_COMMENT voters (0 unsubmitted):
-  // row 20 (null at band4) -> u-admin, row 10 (null at band2) -> u-voter1,
-  // row 19 (null at band1, band9) -> u-multi, row 41 (null at band1) -> u-voter2,
+  // row 20 (null at band 4,14,22) -> u-admin, row 10 (null at band 2,12,24) -> u-voter1,
+  // row 19 (null at band 1,9) -> u-multi, row 41 (null at band 1,21) -> u-voter2,
   // remaining 65 rows -> extraMembers[0..64]
   const extraMembers = userList.slice(6); // 119 users
   const remainingMatrixIndices = Array.from({ length: EXCEL_SCORE_MATRIX.length }, (_, i) => i).filter(
     (i) => i !== 10 && i !== 19 && i !== 20 && i !== 41,
   );
-  const winterScoreVoters: Array<{ userId: string; submitted: boolean; matrixIdx: number }> = [
+  const rokkosaiScoreVoters: Array<{ userId: string; submitted: boolean; matrixIdx: number }> = [
     { userId: 'u-admin', submitted: true, matrixIdx: 20 },
     { userId: 'u-voter1', submitted: true, matrixIdx: 10 },
     { userId: 'u-multi', submitted: true, matrixIdx: 19 },
@@ -512,84 +522,98 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     })),
   ];
 
-  // Build a lookup of which Excel voter has null for which band so bandMembers never skip a non-null Excel cell
-  const excelVoterNullBands = new Map<string, Set<number>>();
-  for (const v of winterScoreVoters) {
-    if (v.matrixIdx >= 0) {
-      const nulls = new Set<number>();
-      EXCEL_SCORE_MATRIX[v.matrixIdx].forEach((val, bIdx) => {
-        if (val === null) nulls.add(bIdx);
-      });
-      excelVoterNullBands.set(v.userId, nulls);
-    }
-  }
-
-  // Fill remaining slots (3-5 members per band) across the 32 winter bands without colliding with non-null Excel cells
-  const unsubmittedScorePool = extraMembers.slice(67, 95);
-  WINTER_BANDS.forEach((_, idx) => {
-    const bandId = `b-win-${idx + 1}`;
-    const targetCount = 3 + (idx % 3); // 3, 4, or 5
-    const bandInsts = ['Vo', 'Gt', 'Ba', 'Dr', idx % 2 === 0 ? 'Key' : 'Gt/Cho'];
-    let instIdx = bandMemberSet.get(bandId)?.size ?? 0;
-
-    // First assign submitted Excel voters whose Excel cell for this band is already null
-    for (const v of winterScoreVoters) {
-      if ((bandMemberSet.get(bandId)?.size ?? 0) >= targetCount) break;
-      if (v.matrixIdx >= 0 && excelVoterNullBands.get(v.userId)?.has(idx)) {
-        if (addMember(bandId, v.userId, bandInsts[instIdx % bandInsts.length])) {
+  // Assign bandMembers for 六甲祭 directly from null cells in EXCEL_SCORE_MATRIX
+  // so each band's member count matches the actual Excel missing-score pattern (2..8 members)
+  const rokkosaiInsts = ['Vo', 'Gt', 'Ba', 'Dr', 'Key', 'Gt/Cho', 'Ba/Cho', 'Gt/Vo'];
+  for (let bIdx = 0; bIdx < ROKKOSAI_BANDS.length; bIdx++) {
+    const bandId = `b-rok-${bIdx + 1}`;
+    let instIdx = 0;
+    for (const v of rokkosaiScoreVoters) {
+      if (EXCEL_SCORE_MATRIX[v.matrixIdx][bIdx] === null) {
+        if (addMember(bandId, v.userId, rokkosaiInsts[(bIdx + instIdx) % rokkosaiInsts.length])) {
           instIdx++;
         }
       }
     }
+  }
 
-    // Fill remaining member slots from non-Excel-matrix members
-    let guard = 0;
-    while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 100) {
-      guard++;
-      const pick = unsubmittedScorePool[(idx * 5 + guard * 7) % unsubmittedScorePool.length];
-      const inst = bandInsts[instIdx % bandInsts.length] ?? INSTRUMENTS[instIdx % INSTRUMENTS.length];
-      if (addMember(bandId, pick.id, inst)) {
-        instIdx++;
-      }
-    }
-  });
-
-  // 3b. Summer bands (24 bands)
-  SUMMER_BANDS.forEach((b, idx) => {
-    const bandId = `b-sum-${idx + 1}`;
-    const bandTime = now - (SUMMER_BANDS.length - idx) * 60_000;
+  // 3b. 冬イベ bands (14 bands, ACTIVE)
+  WINTER_EVENT_BANDS.forEach((b, idx) => {
+    const bandId = `b-win-${idx + 1}`;
+    const bandTime = now - 86_400_000 * 3 - (WINTER_EVENT_BANDS.length - idx) * 60_000;
     bandList.push({
       id: bandId,
-      auditionId: 'aud-2026-summer',
+      auditionId: 'aud-2027-winter',
       name: b.name,
       performanceOrder: idx + 1,
       penaltyDeduction: b.penalty,
-      updatedByUserId: 'u-admin',
+      updatedByUserId: idx % 3 === 0 ? 'u-admin' : extraMembers[idx].id,
       createdAt: bandTime,
       updatedAt: bandTime,
     });
   });
 
-  addMember('b-sum-1', 'u-multi', 'Gt');
-  addMember('b-sum-2', 'u-voter1', 'Ba');
+  addMember('b-win-1', 'u-multi', 'Gt/Vo');
+  addMember('b-win-5', 'u-multi', 'Gt');
+  addMember('b-win-2', 'u-voter1', 'Ba');
+  addMember('b-win-3', 'u-admin', 'Vo');
+  addMember('b-win-4', 'u-voter2', 'Dr');
 
-  const summerPool = userList.filter((u) => u.enrollmentYear <= 2025 && u.id !== 'u-unregistered');
-  SUMMER_BANDS.forEach((_, idx) => {
-    const bandId = `b-sum-${idx + 1}`;
-    const targetCount = 3 + ((idx + 1) % 3);
+  const winterPool = extraMembers.slice(0, 55);
+  WINTER_EVENT_BANDS.forEach((_, idx) => {
+    const bandId = `b-win-${idx + 1}`;
+    const targetCount = 3 + ((idx + 1) % 3); // 3, 4, or 5
     const bandInsts = ['Vo', 'Gt', 'Ba', 'Dr', 'Key'];
     let instIdx = bandMemberSet.get(bandId)?.size ?? 0;
     let guard = 0;
     while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 200) {
       guard++;
-      const pick = summerPool[(idx * 7 + guard * 13 + Math.floor(rand() * 5)) % summerPool.length];
+      const pick = winterPool[(idx * 7 + guard * 13 + Math.floor(rand() * 5)) % winterPool.length];
       if (addMember(bandId, pick.id, bandInsts[instIdx % bandInsts.length])) {
         instIdx++;
       }
     }
   });
 
-  // 3c. Spring DRAFT bands (8 bands)
+  // 3c. mini-NBRF bands (10 bands, ENTRY_CLOSED)
+  MINI_NBRF_BANDS.forEach((name, idx) => {
+    const bandId = `b-nbrf-${idx + 1}`;
+    const bandTime = now - 86_400_000 * 2 - (MINI_NBRF_BANDS.length - idx) * 60_000;
+    bandList.push({
+      id: bandId,
+      auditionId: 'aud-2027-nbrf',
+      name,
+      performanceOrder: idx + 1,
+      penaltyDeduction: 0,
+      updatedByUserId: idx % 2 === 0 ? 'u-admin' : extraMembers[idx + 10].id,
+      createdAt: bandTime,
+      updatedAt: bandTime,
+    });
+  });
+
+  addMember('b-nbrf-1', 'u-multi', 'Gt/Vo');
+  addMember('b-nbrf-4', 'u-multi', 'Gt');
+  addMember('b-nbrf-2', 'u-voter1', 'Ba');
+  addMember('b-nbrf-3', 'u-voter2', 'Dr');
+  addMember('b-nbrf-5', 'u-admin', 'Vo');
+
+  const nbrfPool = extraMembers.slice(10, 65);
+  MINI_NBRF_BANDS.forEach((_, idx) => {
+    const bandId = `b-nbrf-${idx + 1}`;
+    const targetCount = 3 + (idx % 3);
+    const bandInsts = ['Vo', 'Gt', 'Ba', 'Dr', 'Key'];
+    let instIdx = bandMemberSet.get(bandId)?.size ?? 0;
+    let guard = 0;
+    while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 200) {
+      guard++;
+      const pick = nbrfPool[(idx * 5 + guard * 11) % nbrfPool.length];
+      if (addMember(bandId, pick.id, bandInsts[instIdx % bandInsts.length])) {
+        instIdx++;
+      }
+    }
+  });
+
+  // 3d. 春一発ライブ bands (8 bands, DRAFT)
   SPRING_DRAFT_BANDS.forEach((name, idx) => {
     const bandId = `b-spr-${idx + 1}`;
     const bandTime = now - (SPRING_DRAFT_BANDS.length - idx) * 60_000;
@@ -605,8 +629,9 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     });
   });
 
-  const memberPool = userList.filter((u) => u.id !== 'u-unregistered' && u.id !== 'u-comment');
+  const springPool = extraMembers.slice(20, 90);
   addMember('b-spr-1', 'u-voter1', 'Ba');
+  addMember('b-spr-2', 'u-admin', 'Vo');
   SPRING_DRAFT_BANDS.forEach((_, idx) => {
     const bandId = `b-spr-${idx + 1}`;
     const targetCount = 4;
@@ -615,7 +640,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     let guard = 0;
     while ((bandMemberSet.get(bandId)?.size ?? 0) < targetCount && guard < 200) {
       guard++;
-      const pick = memberPool[(idx * 9 + guard * 11) % memberPool.length];
+      const pick = springPool[(idx * 9 + guard * 11) % springPool.length];
       if (addMember(bandId, pick.id, bandInsts[instIdx % bandInsts.length])) {
         instIdx++;
       }
@@ -628,171 +653,279 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   let avSeq = 1;
   let scSeq = 1;
 
-  // --- 4a. 六甲祭2026 (ACTIVE, exact 69x32 Excel matrix) ---
-  const winterCommentVoters: Array<{ userId: string; submitted: boolean }> = [
+  // --- 4a. 六甲祭 (CLOSED, exact 69x32 Excel matrix, 0 unsubmitted) ---
+  const rokkosaiSubmittedAtBase = now - 86_400_000 * 47;
+  const rokkosaiCommentVoters: Array<{ userId: string; submitted: boolean }> = [
     { userId: 'u-comment', submitted: true },
   ];
   for (let i = 95; i < 112; i++) {
-    winterCommentVoters.push({
+    rokkosaiCommentVoters.push({
       userId: extraMembers[i].id,
       submitted: true,
     });
   }
 
-  // Register winter voters
-  for (const v of winterScoreVoters) {
+  for (const v of rokkosaiScoreVoters) {
     voterList.push({
       id: `av-${avSeq++}`,
-      auditionId: 'aud-2026-winter',
+      auditionId: 'aud-2026-rokkosai',
       userId: v.userId,
       permissionType: 'SCORE_AND_COMMENT',
-      isSubmitted: v.submitted,
-      submittedAt: v.submitted ? now - Math.floor(rand() * 3600_000) : null,
-      generalFeedback: v.submitted
-        ? GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)]
-        : '',
+      isSubmitted: true,
+      submittedAt: rokkosaiSubmittedAtBase - Math.floor(rand() * 3600_000),
+      generalFeedback: GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)],
     });
   }
-  for (const v of winterCommentVoters) {
+  for (const v of rokkosaiCommentVoters) {
     voterList.push({
       id: `av-${avSeq++}`,
-      auditionId: 'aud-2026-winter',
+      auditionId: 'aud-2026-rokkosai',
       userId: v.userId,
       permissionType: 'COMMENT_ONLY',
-      isSubmitted: v.submitted,
-      submittedAt: v.submitted ? now - Math.floor(rand() * 3600_000) : null,
-      generalFeedback: v.submitted
-        ? FRESHMAN_GENERAL_FEEDBACKS[Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)]
-        : '',
+      isSubmitted: true,
+      submittedAt: rokkosaiSubmittedAtBase - Math.floor(rand() * 3600_000),
+      generalFeedback:
+        FRESHMAN_GENERAL_FEEDBACKS[Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)],
     });
   }
 
   // Insert exact Excel scores for the 69 submitted SCORE_AND_COMMENT voters
-  for (const v of winterScoreVoters) {
-    if (!v.submitted || v.matrixIdx < 0) continue;
-    for (let bIdx = 0; bIdx < WINTER_BANDS.length; bIdx++) {
-      const bandId = `b-win-${bIdx + 1}`;
+  for (const v of rokkosaiScoreVoters) {
+    for (let bIdx = 0; bIdx < ROKKOSAI_BANDS.length; bIdx++) {
+      const bandId = `b-rok-${bIdx + 1}`;
       if (bandMemberSet.get(bandId)?.has(v.userId)) continue;
 
       const total = EXCEL_SCORE_MATRIX[v.matrixIdx][bIdx];
       if (total === null) continue;
 
-      const { techScore, charmScore } = splitTotalScore(total, WINTER_BANDS[bIdx].techBias, rand);
+      const { techScore, charmScore } = splitTotalScore(
+        total,
+        ROKKOSAI_BANDS[bIdx].techBias,
+        rand,
+      );
       scoreList.push({
         id: `sc-${scSeq++}`,
-        auditionId: 'aud-2026-winter',
+        auditionId: 'aud-2026-rokkosai',
         bandId,
         evaluatorUserId: v.userId,
         techScore,
         charmScore,
         comment: pickComment(total, rand),
-        createdAt: now,
-        updatedAt: now,
+        createdAt: rokkosaiSubmittedAtBase,
+        updatedAt: rokkosaiSubmittedAtBase,
       });
     }
   }
 
-  // Insert comments for submitted COMMENT_ONLY winter voters (techScore=null, charmScore=null)
-  for (const v of winterCommentVoters) {
-    if (!v.submitted) continue;
-    for (let bIdx = 0; bIdx < WINTER_BANDS.length; bIdx++) {
-      const bandId = `b-win-${bIdx + 1}`;
+  // Insert mock comments for submitted COMMENT_ONLY 六甲祭 voters (techScore=null, charmScore=null)
+  for (const v of rokkosaiCommentVoters) {
+    for (let bIdx = 0; bIdx < ROKKOSAI_BANDS.length; bIdx++) {
+      const bandId = `b-rok-${bIdx + 1}`;
       if (bandMemberSet.get(bandId)?.has(v.userId)) continue;
-      // Freshmen typically comment on ~75% of bands (or 100% for u-comment)
       if (v.userId !== 'u-comment' && rand() > 0.78) continue;
       scoreList.push({
         id: `sc-${scSeq++}`,
-        auditionId: 'aud-2026-winter',
+        auditionId: 'aud-2026-rokkosai',
         bandId,
         evaluatorUserId: v.userId,
         techScore: null,
         charmScore: null,
         comment: FRESHMAN_COMMENTS[Math.floor(rand() * FRESHMAN_COMMENTS.length)],
-        createdAt: now,
-        updatedAt: now,
+        createdAt: rokkosaiSubmittedAtBase,
+        updatedAt: rokkosaiSubmittedAtBase,
       });
     }
   }
 
-  // --- 4b. Summer Audition (CLOSED) ---
-  const summerScoreVoterIds = [
+  // --- 4b. 冬イベ (ACTIVE, realistic in-progress scoring state) ---
+  const addWinterScore = (userId: string, bIdx: number, bias: number, scale: number) => {
+    const bandId = `b-win-${bIdx + 1}`;
+    if (bandMemberSet.get(bandId)?.has(userId)) return;
+    const b = WINTER_EVENT_BANDS[bIdx];
+    const total = clamp(
+      Math.round(72 + (b.baseMean - 72) * scale + bias + (rand() - 0.5) * 10),
+      35,
+      99,
+    );
+    const { techScore, charmScore } = splitTotalScore(total, b.techBias, rand);
+    scoreList.push({
+      id: `sc-${scSeq++}`,
+      auditionId: 'aud-2027-winter',
+      bandId,
+      evaluatorUserId: userId,
+      techScore,
+      charmScore,
+      comment: pickComment(total, rand),
+      createdAt: now - 3600_000,
+      updatedAt: now - 1800_000,
+    });
+  };
+
+  // Demo accounts in 冬イベ:
+  // - u-admin, u-voter2: submitted
+  // - u-multi: unsubmitted with partial draft scores (first 5 non-own bands)
+  // - u-voter1: unsubmitted with 0 scores
+  // - u-comment: COMMENT_ONLY unsubmitted with partial comments (first 4 bands)
+  // - u-unregistered: intentionally omitted from auditionVoters
+  for (const userId of ['u-admin', 'u-voter2']) {
+    voterList.push({
+      id: `av-${avSeq++}`,
+      auditionId: 'aud-2027-winter',
+      userId,
+      permissionType: 'SCORE_AND_COMMENT',
+      isSubmitted: true,
+      submittedAt: now - Math.floor(rand() * 3600_000),
+      generalFeedback: GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)],
+    });
+    const voterBias = (rand() - 0.5) * 10;
+    const voterScale = 0.8 + rand() * 0.4;
+    for (let bIdx = 0; bIdx < WINTER_EVENT_BANDS.length; bIdx++) {
+      addWinterScore(userId, bIdx, voterBias, voterScale);
+    }
+  }
+
+  voterList.push({
+    id: `av-${avSeq++}`,
+    auditionId: 'aud-2027-winter',
+    userId: 'u-multi',
+    permissionType: 'SCORE_AND_COMMENT',
+    isSubmitted: false,
+    submittedAt: null,
+    generalFeedback: '',
+  });
+  let multiDrafted = 0;
+  for (let bIdx = 0; bIdx < WINTER_EVENT_BANDS.length && multiDrafted < 5; bIdx++) {
+    const bandId = `b-win-${bIdx + 1}`;
+    if (bandMemberSet.get(bandId)?.has('u-multi')) continue;
+    addWinterScore('u-multi', bIdx, 2, 1.0);
+    multiDrafted++;
+  }
+
+  voterList.push({
+    id: `av-${avSeq++}`,
+    auditionId: 'aud-2027-winter',
+    userId: 'u-voter1',
+    permissionType: 'SCORE_AND_COMMENT',
+    isSubmitted: false,
+    submittedAt: null,
+    generalFeedback: '',
+  });
+
+  voterList.push({
+    id: `av-${avSeq++}`,
+    auditionId: 'aud-2027-winter',
+    userId: 'u-comment',
+    permissionType: 'COMMENT_ONLY',
+    isSubmitted: false,
+    submittedAt: null,
+    generalFeedback: '',
+  });
+  for (let bIdx = 0; bIdx < 4; bIdx++) {
+    const bandId = `b-win-${bIdx + 1}`;
+    if (bandMemberSet.get(bandId)?.has('u-comment')) continue;
+    scoreList.push({
+      id: `sc-${scSeq++}`,
+      auditionId: 'aud-2027-winter',
+      bandId,
+      evaluatorUserId: 'u-comment',
+      techScore: null,
+      charmScore: null,
+      comment: FRESHMAN_COMMENTS[Math.floor(rand() * FRESHMAN_COMMENTS.length)],
+      createdAt: now - 3600_000,
+      updatedAt: now - 1800_000,
+    });
+  }
+
+  // General members in 冬イベ: 45 submitted, 12 partial draft, 10 not started
+  const winterGeneralScoreVoters = extraMembers.slice(0, 67);
+  winterGeneralScoreVoters.forEach((u, idx) => {
+    const isSubmitted = idx < 45;
+    const isDraft = idx >= 45 && idx < 57;
+    voterList.push({
+      id: `av-${avSeq++}`,
+      auditionId: 'aud-2027-winter',
+      userId: u.id,
+      permissionType: 'SCORE_AND_COMMENT',
+      isSubmitted,
+      submittedAt: isSubmitted ? now - Math.floor(rand() * 7200_000) : null,
+      generalFeedback: isSubmitted
+        ? GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)]
+        : '',
+    });
+
+    if (!isSubmitted && !isDraft) return;
+    const voterBias = (rand() - 0.5) * 14;
+    const voterScale = 0.75 + rand() * 0.5;
+    const limit = isSubmitted ? WINTER_EVENT_BANDS.length : 4 + (idx % 5);
+    for (let bIdx = 0; bIdx < limit; bIdx++) {
+      if (isSubmitted && rand() > 0.94) continue;
+      addWinterScore(u.id, bIdx, voterBias, voterScale);
+    }
+  });
+
+  // General COMMENT_ONLY voters in 冬イベ: 8 submitted, 4 unsubmitted
+  const winterGeneralCommentVoters = extraMembers.slice(95, 107);
+  winterGeneralCommentVoters.forEach((u, idx) => {
+    const isSubmitted = idx < 8;
+    voterList.push({
+      id: `av-${avSeq++}`,
+      auditionId: 'aud-2027-winter',
+      userId: u.id,
+      permissionType: 'COMMENT_ONLY',
+      isSubmitted,
+      submittedAt: isSubmitted ? now - Math.floor(rand() * 7200_000) : null,
+      generalFeedback: isSubmitted
+        ? FRESHMAN_GENERAL_FEEDBACKS[Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)]
+        : '',
+    });
+    if (!isSubmitted) return;
+    for (let bIdx = 0; bIdx < WINTER_EVENT_BANDS.length; bIdx++) {
+      const bandId = `b-win-${bIdx + 1}`;
+      if (bandMemberSet.get(bandId)?.has(u.id)) continue;
+      if (rand() > 0.75) continue;
+      scoreList.push({
+        id: `sc-${scSeq++}`,
+        auditionId: 'aud-2027-winter',
+        bandId,
+        evaluatorUserId: u.id,
+        techScore: null,
+        charmScore: null,
+        comment: FRESHMAN_COMMENTS[Math.floor(rand() * FRESHMAN_COMMENTS.length)],
+        createdAt: now - 3600_000,
+        updatedAt: now - 1800_000,
+      });
+    }
+  });
+
+  // --- 4c. mini-NBRF (ENTRY_CLOSED, pre-assigned voters, 0 scores) ---
+  const nbrfScoreVoterIds = [
     'u-admin',
     'u-multi',
     'u-voter1',
     'u-voter2',
-    ...extraMembers.slice(0, 71).map((u) => u.id),
+    ...extraMembers.slice(0, 46).map((u) => u.id),
   ];
-  const summerCommentVoterIds = extraMembers.slice(71, 85).map((u) => u.id);
-
-  for (const userId of summerScoreVoterIds) {
+  for (const userId of nbrfScoreVoterIds) {
     voterList.push({
       id: `av-${avSeq++}`,
-      auditionId: 'aud-2026-summer',
+      auditionId: 'aud-2027-nbrf',
       userId,
       permissionType: 'SCORE_AND_COMMENT',
-      isSubmitted: true,
-      submittedAt: now - 86_400_000 * 90,
-      generalFeedback:
-        GENERAL_FEEDBACKS[Math.floor(rand() * GENERAL_FEEDBACKS.length)],
+      isSubmitted: false,
+      submittedAt: null,
+      generalFeedback: '',
     });
-
-    const voterBias = (rand() - 0.5) * 14;
-    const voterScale = 0.75 + rand() * 0.5;
-    for (let bIdx = 0; bIdx < SUMMER_BANDS.length; bIdx++) {
-      const bandId = `b-sum-${bIdx + 1}`;
-      if (bandMemberSet.get(bandId)?.has(userId)) continue;
-      if (rand() > 0.94) continue; // occasional absent vote
-      const b = SUMMER_BANDS[bIdx];
-      const total = clamp(
-        Math.round(72 + (b.baseMean - 72) * voterScale + voterBias + (rand() - 0.5) * 10),
-        35,
-        99,
-      );
-      const { techScore, charmScore } = splitTotalScore(total, b.techBias, rand);
-      scoreList.push({
-        id: `sc-${scSeq++}`,
-        auditionId: 'aud-2026-summer',
-        bandId,
-        evaluatorUserId: userId,
-        techScore,
-        charmScore,
-        comment: pickComment(total, rand),
-        createdAt: now - 86_400_000 * 90,
-        updatedAt: now - 86_400_000 * 90,
-      });
-    }
   }
-
-  for (const userId of summerCommentVoterIds) {
+  for (const userId of ['u-comment', ...extraMembers.slice(95, 104).map((u) => u.id)]) {
     voterList.push({
       id: `av-${avSeq++}`,
-      auditionId: 'aud-2026-summer',
+      auditionId: 'aud-2027-nbrf',
       userId,
       permissionType: 'COMMENT_ONLY',
-      isSubmitted: true,
-      submittedAt: now - 86_400_000 * 90,
-      generalFeedback:
-        FRESHMAN_GENERAL_FEEDBACKS[
-          Math.floor(rand() * FRESHMAN_GENERAL_FEEDBACKS.length)
-        ],
+      isSubmitted: false,
+      submittedAt: null,
+      generalFeedback: '',
     });
-
-    for (let bIdx = 0; bIdx < SUMMER_BANDS.length; bIdx++) {
-      const bandId = `b-sum-${bIdx + 1}`;
-      if (bandMemberSet.get(bandId)?.has(userId)) continue;
-      if (rand() > 0.75) continue;
-      scoreList.push({
-        id: `sc-${scSeq++}`,
-        auditionId: 'aud-2026-summer',
-        bandId,
-        evaluatorUserId: userId,
-        techScore: null,
-        charmScore: null,
-        comment: FRESHMAN_COMMENTS[Math.floor(rand() * FRESHMAN_COMMENTS.length)],
-        createdAt: now - 86_400_000 * 90,
-        updatedAt: now - 86_400_000 * 90,
-      });
-    }
   }
 
   return {
