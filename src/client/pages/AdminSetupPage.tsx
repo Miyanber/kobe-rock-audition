@@ -152,6 +152,7 @@ export function AdminSetupPage({
   const [newEntryDeadline, setNewEntryDeadline] = useState(
     () => `${getTodayDateString()}T23:59`,
   );
+  const [newScoringDeadline, setNewScoringDeadline] = useState('');
   const [entryDeadlineTouched, setEntryDeadlineTouched] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -171,6 +172,7 @@ export function AdminSetupPage({
       setNewTitle('');
       setNewEventDate(today);
       setNewEntryDeadline(`${today}T23:59`);
+      setNewScoringDeadline('');
       setEntryDeadlineTouched(false);
     }
   }, [showCreateModal]);
@@ -464,10 +466,12 @@ export function AdminSetupPage({
           title: newTitle.trim(),
           eventDate: newEventDate,
           entryDeadline: newEntryDeadline.trim(),
+          scoringDeadline: newScoringDeadline.trim() || null,
         }),
       });
       onCloseCreateModal();
       setNewTitle('');
+      setNewScoringDeadline('');
       await onAuditionsChanged();
       onSelectAudition(res.audition.id);
       showToast(
@@ -1814,6 +1818,28 @@ export function AdminSetupPage({
                 />
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
                   ※この日時を過ぎると、ステータスが「バンド募集中」でも一般部員によるバンド登録・編集が自動的にロックされます。
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="create-scoring-deadline"
+                  className="block text-xs font-bold text-zinc-700"
+                >
+                  採点締切{' '}
+                  <span className="text-[11px] font-normal text-zinc-500">
+                    （任意）
+                  </span>
+                </label>
+                <input
+                  id="create-scoring-deadline"
+                  type="datetime-local"
+                  value={newScoringDeadline}
+                  onChange={(e) => setNewScoringDeadline(e.target.value)}
+                  className="w-full rounded-sm border border-zinc-300 px-3 py-2 text-sm focus:border-slate-700 focus:outline-none"
+                />
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  ※未入力のまま作成できます。採点受付中へ切り替える際にも確認・設定できます。
                 </p>
               </div>
 
