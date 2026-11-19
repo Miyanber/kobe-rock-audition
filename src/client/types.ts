@@ -120,10 +120,24 @@ export interface VoterGeneralFeedbackDto {
   generalFeedback: string;
 }
 
+export interface VoterBandCommentDto {
+  bandId: string;
+  evaluatorUserId: string;
+  evaluatorName: string;
+  permissionType: PermissionType;
+  activeNormalized: {
+    normTech: number;
+    normCharm: number;
+    normTotal: number;
+  } | null;
+  comment: string;
+}
+
 export interface VoterResultsResponse {
   audition: AuditionDto;
   rankings: VoterBandRankingDto[];
   generalFeedbacks?: VoterGeneralFeedbackDto[];
+  bandComments?: VoterBandCommentDto[];
 }
 
 export interface AdminVoterMonitorDto {

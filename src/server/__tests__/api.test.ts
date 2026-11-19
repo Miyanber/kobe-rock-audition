@@ -1458,6 +1458,12 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       { headers: { Cookie: voter1Cookie } },
     );
     expect(allowedResultsRes.status).toBe(200);
+    const allowedResultsBody = (await allowedResultsRes.json()) as {
+      rankings: unknown[];
+      bandComments?: Array<{ bandId: string; evaluatorUserId: string; comment: string }>;
+    };
+    expect(Array.isArray(allowedResultsBody.bandComments)).toBe(true);
+    expect((allowedResultsBody.bandComments ?? []).length).toBeGreaterThan(0);
 
     const allowedExportRes = await app.request(
       '/api/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',

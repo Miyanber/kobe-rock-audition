@@ -21,10 +21,7 @@ import {
 import { LoginPage } from './pages/LoginPage.tsx';
 import { ScoringPage } from './pages/ScoringPage.tsx';
 import { WikiBandsPage } from './pages/WikiBandsPage.tsx';
-import {
-  AdminDashboardPage,
-  type AdminDashboardTab,
-} from './pages/AdminDashboardPage.tsx';
+import { AdminDashboardPage } from './pages/AdminDashboardPage.tsx';
 import { AdminSetupPage } from './pages/AdminSetupPage.tsx';
 import { AdminUsersPage } from './pages/AdminUsersPage.tsx';
 import { VoterResultsPage } from './pages/VoterResultsPage.tsx';
@@ -69,12 +66,6 @@ export function App() {
     readShowOldAuditionsPreference,
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [requestedDashboardTab, setRequestedDashboardTab] = useState<
-    AdminDashboardTab | undefined
-  >(undefined);
-  const clearRequestedDashboardTab = useCallback(() => {
-    setRequestedDashboardTab(undefined);
-  }, []);
 
   const visibleAuditions = useMemo(
     () => filterVisibleAuditions(auditions, showOldAuditions),
@@ -626,8 +617,6 @@ export function App() {
           onAuditionsChanged={async () => {
             await fetchAuditions();
           }}
-          initialTab={requestedDashboardTab}
-          onInitialTabConsumed={clearRequestedDashboardTab}
         />
       ) : (
         <VoterResultsPage
@@ -652,10 +641,6 @@ export function App() {
           showOldAuditions={showOldAuditions}
           oldAuditionCount={oldAuditionCount}
           onToggleShowOldAuditions={handleToggleShowOldAuditions}
-          onNavigateToBandOrder={() => {
-            setRequestedDashboardTab('bandOrder');
-            navigateTo('results', currentAudition.id);
-          }}
         />
       );
     }

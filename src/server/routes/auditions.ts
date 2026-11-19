@@ -354,6 +354,20 @@ export const auditionRoutes = new Hono<AppEnv>()
           submittedAt: g.submittedAt,
           generalFeedback: g.generalFeedback,
         })),
+      bandComments: loaded.aggregation.voteRecords
+        .filter(
+          (v) =>
+            !v.isOwnBand &&
+            (v.isValidNumericVote || v.comment.trim().length > 0),
+        )
+        .map((v) => ({
+          bandId: v.bandId,
+          evaluatorUserId: v.evaluatorUserId,
+          evaluatorName: v.evaluatorName,
+          permissionType: v.permissionType,
+          activeNormalized: v.activeNormalized,
+          comment: v.comment,
+        })),
     });
   })
   .get('/:id/export', async (c) => {

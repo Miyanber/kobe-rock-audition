@@ -20,6 +20,7 @@ import type {
 import { StatusBadge } from '../components/AdminAuditionHeader.tsx';
 import {
   formatDeadlineDisplay,
+  formatRemainingDeadline,
   isDeadlineExpired,
 } from '../../shared/deadline.ts';
 
@@ -46,6 +47,12 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const loadSelectableUsers = useCallback(async () => {
     try {
@@ -210,7 +217,11 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
     );
   }
 
-  const isEntryExpired = isDeadlineExpired(audition?.entryDeadline);
+  const isEntryExpired = isDeadlineExpired(audition?.entryDeadline, nowMs);
+  const remainingEntryText = formatRemainingDeadline(
+    audition?.entryDeadline,
+    nowMs,
+  );
 
   return (
     <div className="space-y-5">
@@ -249,10 +260,15 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
                 className={`text-xs ${
                   isEntryExpired
                     ? 'font-semibold text-rose-700'
-                    : 'text-zinc-500'
+                    : 'text-zinc-600'
                 }`}
               >
                 募集締切: {formatDeadlineDisplay(audition.entryDeadline)}
+                {remainingEntryText && (
+                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-sm bg-amber-50 border border-amber-200 text-amber-800 font-semibold text-[11px]">
+                    {remainingEntryText}
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -297,9 +313,6 @@ export function WikiBandsPage({ user, auditionId }: WikiBandsPageProps) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-sm bg-slate-700 text-white font-bold text-xs shrink-0">
-                    {band.performanceOrder}
-                  </span>
                   <div className="min-w-0 flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-zinc-800 text-sm sm:text-base truncate">
                       {band.name}

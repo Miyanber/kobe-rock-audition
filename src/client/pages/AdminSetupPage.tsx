@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowRight,
   ArrowUpDown,
   ChevronDown,
+  Eraser,
   FilePlus2,
   Play,
   Plus,
@@ -45,7 +45,6 @@ interface AdminSetupPageProps {
   showOldAuditions?: boolean;
   oldAuditionCount?: number;
   onToggleShowOldAuditions?: (show: boolean) => void;
-  onNavigateToBandOrder?: () => void;
 }
 
 type SetupSectionId =
@@ -146,7 +145,6 @@ export function AdminSetupPage({
   showOldAuditions = false,
   oldAuditionCount = 0,
   onToggleShowOldAuditions,
-  onNavigateToBandOrder,
 }: AdminSetupPageProps) {
   // 新規オーディション作成モーダル
   const [newTitle, setNewTitle] = useState('');
@@ -198,6 +196,8 @@ export function AdminSetupPage({
   const [allUsers, setAllUsers] = useState<SelectableUserDto[]>([]);
   const [currentVoters, setCurrentVoters] = useState<AdminVoterMonitorDto[]>([]);
   const [auditionBands, setAuditionBands] = useState<BandWithMembersDto[]>([]);
+  const [slotBandIds, setSlotBandIds] = useState<string[]>([]);
+  const [savingBandOrder, setSavingBandOrder] = useState(false);
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
   const [performerFilter, setPerformerFilter] = useState<PerformerFilter>('ALL');
   const [permissionFilter, setPermissionFilter] = useState<PermissionFilter>('ALL');
@@ -232,10 +232,15 @@ export function AdminSetupPage({
         ),
       ]);
       setCurrentVoters(votersRes.voters);
-      setAuditionBands(bandsRes.bands);
+      const sortedBands = [...bandsRes.bands].sort(
+        (a, b) => a.performanceOrder - b.performanceOrder,
+      );
+      setAuditionBands(sortedBands);
+      setSlotBandIds(sortedBands.map((b) => b.id));
     } else {
       setCurrentVoters([]);
       setAuditionBands([]);
+      setSlotBandIds([]);
     }
   };
 
@@ -582,8 +587,95 @@ export function AdminSetupPage({
       insertedCount: res.insertedCount,
       warnings: res.warnings,
     });
-    setAuditionBands(res.bands);
+    const sortedBands = [...res.bands].sort(
+      (a, b) => a.performanceOrder - b.performanceOrder,
+    );
+    setAuditionBands(sortedBands);
+    setSlotBandIds(sortedBands.map((b) => b.id));
     showToast(`${res.insertedCount}件のバンドを一括登録しました`);
+  };
+
+  const bandByIdMap = useMemo(
+    () => new Map(auditionBands.map((b) => [b.id, b])),
+    [auditionBands],
+  );
+  const assignedSlotMap = useMemo(() => {
+    const map = new Map<string, number>();
+    slotBandIds.forEach((id, idx) => {
+      if (id) map.set(id, idx);
+    });
+    return map;
+  }, [slotBandIds]);
+  const unassignedBands = useMemo(
+    () => auditionBands.filter((b) => !assignedSlotMap.has(b.id)),
+    [auditionBands, assignedSlotMap],
+  );
+  const hasEmptyBandSlots =
+    slotBandIds.length !== auditionBands.length ||
+    slotBandIds.some((id) => !id);
+  const isBandOrderDirty =
+    slotBandIds.length === auditionBands.length &&
+    slotBandIds.some((id, idx) => auditionBands[idx]?.id !== id);
+
+  const handleSelectBandForSlot = (slotIndex: number, nextBandId: string) => {
+    setSlotBandIds((prev) => {
+      const next = [...prev];
+      if (!nextBandId) {
+        next[slotIndex] = '';
+        return next;
+      }
+      const existingIdx = next.indexOf(nextBandId);
+      const currentBandId = next[slotIndex] ?? '';
+      if (existingIdx !== -1 && existingIdx !== slotIndex) {
+        next[existingIdx] = currentBandId;
+        next[slotIndex] = nextBandId;
+        const pickedName = bandByIdMap.get(nextBandId)?.name ?? '';
+        showToast(
+          `「${pickedName}」を ${slotIndex + 1}バンド目へ設定し、${existingIdx + 1}バンド目と入れ替えました`,
+        );
+      } else {
+        next[slotIndex] = nextBandId;
+      }
+      return next;
+    });
+  };
+
+  const handleClearBandSlots = () => {
+    setSlotBandIds(Array(auditionBands.length).fill(''));
+  };
+
+  const handleResetBandSlots = () => {
+    setSlotBandIds(auditionBands.map((b) => b.id));
+  };
+
+  const handleSaveBandOrder = async () => {
+    if (
+      !selectedAuditionId ||
+      hasEmptyBandSlots ||
+      !isBandOrderDirty ||
+      savingBandOrder ||
+      auditionBands.length === 0
+    ) {
+      return;
+    }
+    setSavingBandOrder(true);
+    try {
+      await apiJson(
+        `/api/admin/auditions/${selectedAuditionId}/bands/order`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ bandIds: slotBandIds }),
+        },
+      );
+      await Promise.all([loadContext(), onAuditionsChanged()]);
+      showToast('バンドの出演順を保存しました');
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : '出演順の保存に失敗しました',
+      );
+    } finally {
+      setSavingBandOrder(false);
+    }
   };
 
   const handleBulkVoters = async () => {
@@ -1351,7 +1443,7 @@ export function AdminSetupPage({
                 </div>
               </section>
 
-              {/* 3. バンド出演順設定（集計タブへ移設） */}
+              {/* 3. バンド出演順設定 */}
               <section
                 id="setup-band-order"
                 className="scroll-mt-28 bg-zinc-50 border border-zinc-300 rounded-sm p-4 sm:p-5 space-y-3"
@@ -1370,27 +1462,184 @@ export function AdminSetupPage({
                   } lg:block space-y-3 pt-2 lg:pt-0 border-t border-zinc-200 lg:border-t-0`}
                 >
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="space-y-1">
+                    <div>
                       <h2 className="hidden lg:flex text-base font-bold text-zinc-800 items-center gap-2">
                         <ArrowUpDown className="h-5 w-5 text-slate-700" />
-                        バンド出演順の設定（{auditionBands.length}組）
+                        バンド出演順の設定（1バンド目〜{auditionBands.length}バンド目）
                       </h2>
-                      <p className="text-xs text-zinc-600 leading-relaxed">
-                        バンド出演順（1バンド目〜{auditionBands.length}バンド目）のプルダウン選択および入れ替えは、集計画面の「出演順」タブから操作できます。
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        各枠のプルダウンからバンドを選択してください。別の枠に割り当て済みのバンドを選ぶと自動的に枠同士が入れ替わります。
                       </p>
                     </div>
-                    {onNavigateToBandOrder && (
+                    <div className="flex items-center flex-wrap gap-2">
+                      {auditionBands.length > 0 && (
+                        <button
+                          type="button"
+                          disabled={savingBandOrder}
+                          onClick={handleClearBandSlots}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
+                        >
+                          <Eraser className="h-3.5 w-3.5" />
+                          すべてクリア
+                        </button>
+                      )}
+                      {(isBandOrderDirty || hasEmptyBandSlots) &&
+                        auditionBands.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={savingBandOrder}
+                            onClick={handleResetBandSlots}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-xs font-bold text-zinc-700 cursor-pointer disabled:opacity-50"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            元に戻す
+                          </button>
+                        )}
                       <button
                         type="button"
-                        onClick={onNavigateToBandOrder}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition cursor-pointer shrink-0"
+                        disabled={
+                          hasEmptyBandSlots ||
+                          !isBandOrderDirty ||
+                          savingBandOrder ||
+                          auditionBands.length === 0
+                        }
+                        onClick={() => void handleSaveBandOrder()}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <ArrowUpDown className="h-4 w-4" />
-                        <span>集計画面の「出演順」タブを開く</span>
-                        <ArrowRight className="h-4 w-4" />
+                        <Save className="h-4 w-4" />
+                        {savingBandOrder ? '保存中...' : '出演順を保存'}
                       </button>
-                    )}
+                    </div>
                   </div>
+
+                  {(selectedAudition?.status === 'ACTIVE' ||
+                    selectedAudition?.status === 'CLOSED') && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-sm px-3.5 py-2.5 text-xs text-amber-900">
+                      現在「{getAuditionStatusLabel(selectedAudition.status)}」のオーディションです。出演順を変更すると、採点画面の表示順や同点時のタイブレーク順位に影響します。
+                    </div>
+                  )}
+
+                  {unassignedBands.length > 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-sm px-3.5 py-2.5 text-xs text-amber-900 space-y-1">
+                      <p className="font-bold">
+                        未割当の枠が {unassignedBands.length}件あります。すべての枠にバンドを選択すると保存できます。
+                      </p>
+                      <p className="text-amber-800">
+                        未割当バンド: {unassignedBands.map((b) => b.name).join('、')}
+                      </p>
+                    </div>
+                  ) : (
+                    isBandOrderDirty && (
+                      <div className="bg-sky-50 border border-sky-200 rounded-sm px-3.5 py-2 text-xs font-semibold text-sky-900">
+                        未保存の出演順変更があります。「出演順を保存」を押すと確定します。
+                      </div>
+                    )
+                  )}
+
+                  {auditionBands.length === 0 ? (
+                    <div className="bg-white border border-dashed border-zinc-300 rounded-sm p-8 text-center text-xs text-zinc-500">
+                      このオーディションにはまだバンドが登録されていません。
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-zinc-300 rounded-sm divide-y divide-zinc-200">
+                      {auditionBands.map((_, slotIndex) => {
+                        const slotOrder = slotIndex + 1;
+                        const selectedId = slotBandIds[slotIndex] ?? '';
+                        const selectedBand = selectedId
+                          ? bandByIdMap.get(selectedId)
+                          : undefined;
+                        const orderChanged =
+                          selectedBand !== undefined &&
+                          selectedBand.performanceOrder !== slotOrder;
+
+                        return (
+                          <div
+                            key={`slot-${slotOrder}`}
+                            className="p-3.5 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3"
+                          >
+                            <div className="flex items-center gap-2 shrink-0 sm:w-32">
+                              <span
+                                className={`inline-flex items-center justify-center h-7 px-2.5 rounded-sm text-xs font-bold ${
+                                  !selectedBand
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    : orderChanged
+                                      ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                                      : 'bg-slate-700 text-white'
+                                }`}
+                              >
+                                {slotOrder}バンド目
+                              </span>
+                              {orderChanged && selectedBand && (
+                                <span className="text-[11px] font-mono text-zinc-500">
+                                  (元:{selectedBand.performanceOrder})
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  aria-label={`${slotOrder}バンド目のバンド選択`}
+                                  value={selectedId}
+                                  disabled={savingBandOrder}
+                                  onChange={(e) =>
+                                    handleSelectBandForSlot(
+                                      slotIndex,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full rounded-sm border border-zinc-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-zinc-800 focus:border-slate-700 focus:outline-none"
+                                >
+                                  <option value="">
+                                    -- バンドを選択してください --
+                                  </option>
+                                  {auditionBands.map((band) => {
+                                    const otherSlot = assignedSlotMap.get(
+                                      band.id,
+                                    );
+                                    let suffix = '';
+                                    if (otherSlot === undefined) {
+                                      suffix = '（未割当）';
+                                    } else if (otherSlot !== slotIndex) {
+                                      suffix = `（現在 ${otherSlot + 1}バンド目・選択で入替）`;
+                                    }
+                                    return (
+                                      <option key={band.id} value={band.id}>
+                                        {band.name}
+                                        {suffix}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                {selectedId && (
+                                  <button
+                                    type="button"
+                                    disabled={savingBandOrder}
+                                    onClick={() =>
+                                      handleSelectBandForSlot(slotIndex, '')
+                                    }
+                                    className="px-2.5 py-2 rounded-sm border border-zinc-300 bg-white hover:bg-zinc-100 text-xs font-semibold text-zinc-600 shrink-0 cursor-pointer disabled:opacity-50"
+                                    title="この枠の選択を解除"
+                                  >
+                                    解除
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-zinc-500 truncate">
+                                {selectedBand
+                                  ? selectedBand.members.length > 0
+                                    ? selectedBand.members
+                                        .map((m) => m.name)
+                                        .join(' / ')
+                                    : 'メンバー未設定'
+                                  : '未選択の枠です'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </section>
 
