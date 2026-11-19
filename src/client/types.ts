@@ -8,10 +8,10 @@ import type { AuditionAggregationOutput } from '../shared/aggregation.ts';
 
 export interface AuthUserDto {
   id: string;
-  email: string;
   name: string;
   role: Role;
   enrollmentYear: number;
+  isGradeConfirmed: boolean;
   grade: number;
 }
 
@@ -148,7 +148,6 @@ export interface AdminVoterMonitorDto {
   submittedAt: number | null;
   generalFeedback: string;
   name: string;
-  email: string;
   enrollmentYear: number;
   role: Role;
   grade: number;
@@ -166,7 +165,7 @@ export interface AdminResultsResponse {
 export interface SelectableUserDto {
   id: string;
   name: string;
-  email?: string;
+  isGoogleLinked?: boolean;
   enrollmentYear: number;
   grade: number;
   role?: Role;

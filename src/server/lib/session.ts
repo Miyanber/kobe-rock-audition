@@ -12,6 +12,7 @@ export interface RuntimeConfig {
   allowedDomains: string[];
   initialAdminEmails: string[];
   sessionSecret: string;
+  studentIdHashSecret: string;
   allowUnregisteredDomainUsers: boolean;
   enableDevLogin: boolean;
 }
@@ -31,7 +32,7 @@ export function getRuntimeConfig(c: Context<AppEnv>): RuntimeConfig {
   const bindings = c.env;
   const allowedRaw = readEnvValue(bindings, 'ALLOWED_GOOGLE_DOMAIN') || 'stu.kobe-u.ac.jp';
   const adminRaw = readEnvValue(bindings, 'INITIAL_ADMIN_EMAILS') || 'admin@stu.kobe-u.ac.jp';
-  const allowUnregRaw = readEnvValue(bindings, 'ALLOW_UNREGISTERED_DOMAIN_USERS') || 'true';
+  const allowUnregRaw = readEnvValue(bindings, 'ALLOW_UNREGISTERED_DOMAIN_USERS') || 'false';
   const devLoginRaw = readEnvValue(bindings, 'ENABLE_DEV_LOGIN');
 
   // 本番Workersで明示的に 'false' とされない限り、ローカル開発では有効化しやすい設定
@@ -53,7 +54,10 @@ export function getRuntimeConfig(c: Context<AppEnv>): RuntimeConfig {
     sessionSecret:
       readEnvValue(bindings, 'SESSION_SECRET') ||
       'local-dev-insecure-session-secret-change-in-production',
-    allowUnregisteredDomainUsers: allowUnregRaw.toLowerCase() !== 'false',
+    studentIdHashSecret:
+      readEnvValue(bindings, 'STUDENT_ID_HASH_SECRET') ||
+      'local-dev-insecure-student-id-hash-secret-change-in-production',
+    allowUnregisteredDomainUsers: allowUnregRaw.toLowerCase() === 'true',
     enableDevLogin,
   };
 }

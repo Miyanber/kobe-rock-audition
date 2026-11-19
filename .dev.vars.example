@@ -8,4 +8,4 @@ INITIAL_ADMIN_EMAILS=admin@stu.kobe-u.ac.jp
 SESSION_SECRET=change-this-to-a-long-random-secret-key-at-least-32-chars
 ALLOW_UNREGISTERED_DOMAIN_USERS=true
 ENABLE_DEV_LOGIN=true
-
+STUDENT_ID_HASH_SECRET=change-this-to-a-long-random-secret-key-at-least-32-chars

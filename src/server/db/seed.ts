@@ -45,7 +45,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
   await db.insert(users).values([
     {
       id: 'u-admin',
-      email: 'admin@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-admin',
       name: '神戸 太郎 (運営委員長)',
       role: 'ADMIN',
       enrollmentYear: 2023,
@@ -54,7 +54,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
     },
     {
       id: 'u-multi',
-      email: 'guitarist@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-guitarist',
       name: '六甲 健太 (掛け持ち)',
       role: 'VOTER',
       enrollmentYear: 2024,
@@ -63,7 +63,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
     },
     {
       id: 'u-voter1',
-      email: 'bassist@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-bassist',
       name: '灘 花子',
       role: 'VOTER',
       enrollmentYear: 2024,
@@ -72,7 +72,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
     },
     {
       id: 'u-voter2',
-      email: 'drummer@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-drummer',
       name: '三宮 翔',
       role: 'VOTER',
       enrollmentYear: 2025,
@@ -81,7 +81,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
     },
     {
       id: 'u-comment',
-      email: 'freshman@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-freshman',
       name: '元町 葵 (1回生/コメントのみ)',
       role: 'VOTER',
       enrollmentYear: 2026,
@@ -90,7 +90,7 @@ export async function ensureSeedData(db: AppDb): Promise<void> {
     },
     {
       id: 'u-unregistered',
-      email: 'newbie@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-newbie',
       name: '垂水 蓮 (対象外テスト)',
       role: 'VOTER',
       enrollmentYear: 2026,

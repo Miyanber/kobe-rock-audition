@@ -316,7 +316,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
   const userList: NewUser[] = [
     {
       id: 'u-admin',
-      email: 'admin@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-admin',
       name: '神戸 太郎 (運営委員長)',
       role: 'ADMIN',
       enrollmentYear: 2024,
@@ -325,7 +325,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'u-multi',
-      email: 'guitarist@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-guitarist',
       name: '六甲 健太 (掛け持ち)',
       role: 'VOTER',
       enrollmentYear: 2024,
@@ -334,7 +334,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'u-voter1',
-      email: 'bassist@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-bassist',
       name: '灘 花子',
       role: 'VOTER',
       enrollmentYear: 2024,
@@ -343,7 +343,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'u-voter2',
-      email: 'drummer@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-drummer',
       name: '三宮 翔',
       role: 'VOTER',
       enrollmentYear: 2025,
@@ -352,7 +352,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'u-comment',
-      email: 'freshman@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-freshman',
       name: '元町 葵 (1回生/コメントのみ)',
       role: 'VOTER',
       enrollmentYear: 2026,
@@ -361,7 +361,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
     },
     {
       id: 'u-unregistered',
-      email: 'newbie@stu.kobe-u.ac.jp',
+      studentIdHash: 'seed-hash-newbie',
       name: '垂水 蓮 (対象外テスト)',
       role: 'VOTER',
       enrollmentYear: 2026,
@@ -392,7 +392,7 @@ export function buildRealisticSeedData(now: number = Date.now()): RealisticSeedD
 
     userList.push({
       id: `u-m${String(i).padStart(3, '0')}`,
-      email: `${prefix}1${String(i).padStart(4, '0')}k@stu.kobe-u.ac.jp`,
+      studentIdHash: `seed-hash-${prefix}1${String(i).padStart(4, '0')}k`,
       name: fullName,
       role,
       enrollmentYear: year,

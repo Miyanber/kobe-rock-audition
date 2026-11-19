@@ -93,9 +93,10 @@ npm run build  # Vite 本番ビルド + TypeScript 型チェック
 | `GOOGLE_CLIENT_ID` | 本番必須 | Google Cloud Console の OAuth 2.0 クライアント ID |
 | `GOOGLE_CLIENT_SECRET` | 本番必須 | Google Cloud Console の OAuth 2.0 クライアントシークレット |
 | `SESSION_SECRET` | 本番必須 | セッション Cookie (JWT) 署名用のランダム文字列（32文字以上推奨） |
+| `STUDENT_ID_HASH_SECRET` | 本番必須 | 学籍番号の HMAC-SHA256 ハッシュ化用シークレット（32文字以上推奨） |
 | `ALLOWED_GOOGLE_DOMAIN` | 推奨 | 許可する学内ドメイン（カンマ区切り可。例: `stu.kobe-u.ac.jp`） |
 | `INITIAL_ADMIN_EMAILS` | 推奨 | 初回ログイン時に自動で `ADMIN` ロールにするメールアドレス（カンマ区切り） |
-| `ALLOW_UNREGISTERED_DOMAIN_USERS` | 任意 | `true`: マスタ未登録でも学内ドメインなら `VOTER` 作成 / `false`: 事前登録者のみ許可 |
+| `ALLOW_UNREGISTERED_DOMAIN_USERS` | 任意 | `false`（既定）: 事前登録された部員（ハッシュ一致）のみ許可 / `true`: 学内ドメインなら自動作成 |
 | `ENABLE_DEV_LOGIN` | 任意 | 本番環境では必ず `false`（`wrangler.jsonc` の既定値）にする |
 
 Google Cloud Console 側の「承認済みリダイレクト URI」には以下を登録してください：
@@ -122,6 +123,7 @@ Google Cloud Console 側の「承認済みリダイレクト URI」には以下�
    npx wrangler secret put GOOGLE_CLIENT_ID
    npx wrangler secret put GOOGLE_CLIENT_SECRET
    npx wrangler secret put SESSION_SECRET
+   npx wrangler secret put STUDENT_ID_HASH_SECRET
    ```
 
 4. **ビルド＆デプロイ**

@@ -19,7 +19,6 @@ export interface AggregationBandInput {
 export interface AggregationVoterInput {
   userId: string;
   userName: string;
-  email?: string;
   enrollmentYear?: number;
   permissionType: PermissionType;
   isSubmitted: boolean;

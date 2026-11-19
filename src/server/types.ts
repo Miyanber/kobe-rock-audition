@@ -10,16 +10,17 @@ export interface EnvBindings {
   ALLOWED_GOOGLE_DOMAIN?: string;
   INITIAL_ADMIN_EMAILS?: string;
   SESSION_SECRET?: string;
+  STUDENT_ID_HASH_SECRET?: string;
   ALLOW_UNREGISTERED_DOMAIN_USERS?: string;
   ENABLE_DEV_LOGIN?: string;
 }
 
 export interface AuthUser {
   id: string;
-  email: string;
   name: string;
   role: Role;
   enrollmentYear: number;
+  isGradeConfirmed: boolean;
 }
 
 export interface AppVariables {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { apiJson } from './api/client.ts';
 import { AdminAuditionHeader } from './components/AdminAuditionHeader.tsx';
+import { GradeConfirmModal } from './components/GradeConfirmModal.tsx';
 import { Layout } from './components/Layout.tsx';
 import {
   buildDocumentTitle,
@@ -658,6 +659,16 @@ export function App() {
       subHeader={subHeader}
     >
       {renderMainContent()}
+      {authInfo.user && !authInfo.user.isGradeConfirmed && (
+        <GradeConfirmModal
+          user={authInfo.user}
+          onConfirmed={(updatedUser) => {
+            setAuthInfo((prev) =>
+              prev ? { ...prev, user: updatedUser } : prev,
+            );
+          }}
+        />
+      )}
     </Layout>
   );
 }

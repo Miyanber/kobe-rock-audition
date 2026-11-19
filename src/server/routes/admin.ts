@@ -11,6 +11,13 @@ import {
   users,
 } from '../db/schema.ts';
 import { requireAdmin } from '../middleware/auth.ts';
+import { getRuntimeConfig } from '../lib/session.ts';
+import {
+  hashStudentId,
+  inferEnrollmentYearFromStudentId,
+  isValidHalfWidthStudentId,
+  normalizeStudentId,
+} from '../lib/student-id.ts';
 import {
   loadAuditionAggregation,
   loadBandsWithMembers,
@@ -289,8 +296,9 @@ export const adminRoutes = new Hono<AppEnv>()
         return c.json({ error: '有効な行が見つかりませんでした。' }, 400);
       }
 
+      const config = getRuntimeConfig(c);
       const allUsers = await db.select().from(users);
-      const userByEmail = new Map(allUsers.map((u) => [u.email.toLowerCase(), u]));
+      const userByStudentIdHash = new Map(allUsers.map((u) => [u.studentIdHash, u]));
       const userByName = new Map(allUsers.map((u) => [u.name.trim(), u]));
 
       // ヘッダー行判定
@@ -348,9 +356,14 @@ export const adminRoutes = new Hono<AppEnv>()
         const matchedUserIds = new Set<string>();
         for (const token of memberTokens) {
           const cleanToken = token.replace(/\s*\([^)]*\)$/, '').trim();
-          const byEmail = userByEmail.get(cleanToken.toLowerCase());
+          const normalized = normalizeStudentId(cleanToken);
+          const byHash = normalized
+            ? userByStudentIdHash.get(
+                await hashStudentId(normalized, config.studentIdHashSecret),
+              )
+            : undefined;
           const byName = userByName.get(cleanToken);
-          const matched = byEmail ?? byName;
+          const matched = byHash ?? byName;
           if (matched) {
             matchedUserIds.add(matched.id);
           } else {
@@ -502,7 +515,6 @@ export const adminRoutes = new Hono<AppEnv>()
         submittedAt: auditionVoters.submittedAt,
         generalFeedback: auditionVoters.generalFeedback,
         name: users.name,
-        email: users.email,
         enrollmentYear: users.enrollmentYear,
         role: users.role,
       })
@@ -731,19 +743,30 @@ export const adminRoutes = new Hono<AppEnv>()
   .get('/users', async (c) => {
     const db = c.get('db');
     const rows = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        enrollmentYear: users.enrollmentYear,
+        googleSub: users.googleSub,
+      })
       .from(users)
       .orderBy(desc(users.enrollmentYear), asc(users.name));
 
     return c.json({
       users: rows.map((u) => ({
-        ...u,
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        enrollmentYear: u.enrollmentYear,
+        isGoogleLinked: Boolean(u.googleSub),
         grade: calculateGrade(u.enrollmentYear),
       })),
     });
   })
   .post('/users/bulk', zValidator('json', BulkUsersSchema), async (c) => {
     const db = c.get('db');
+    const config = getRuntimeConfig(c);
     const { csvText } = c.req.valid('json');
     const rows = parseDelimitedText(csvText);
 
@@ -752,38 +775,76 @@ export const adminRoutes = new Hono<AppEnv>()
     }
 
     let startIdx = 0;
-    const headerTest = rows[0].join(' ').toLowerCase();
+    const headerTest = rows[0].join('').replace(/[\s\u3000]+/g, '').toLowerCase();
     if (
-      /name|email|氏名|名前|メール|年度|year/.test(headerTest) &&
-      !rows[0].some((cell) => cell.includes('@'))
+      /name|student|email|氏名|名前|学籍|メール|年度|year/.test(headerTest) &&
+      !rows[0].some((cell) => cell.includes('@') || /\d{4,}/.test(cell))
     ) {
       startIdx = 1;
     }
 
+    const existingHashRows = await db
+      .select({ studentIdHash: users.studentIdHash })
+      .from(users);
+    const existingHashes = new Set(existingHashRows.map((r) => r.studentIdHash));
+
     const now = Date.now();
     const defaultYear = getAcademicYear();
-    let upsertedCount = 0;
+    let insertedCount = 0;
+    let skippedCount = 0;
     const errors: string[] = [];
 
     for (let i = startIdx; i < rows.length; i++) {
       const cols = rows[i];
       if (cols.length < 2) {
-        errors.push(`${i + 1}行目: 氏名とメールアドレスが必要です。`);
+        errors.push(`${i + 1}行目: 氏名と学籍番号が必要です。`);
         continue;
       }
 
-      const name = cols[0].trim();
-      const email = cols[1].trim().toLowerCase();
-      const yearNum = cols[2] ? Number(cols[2]) : defaultYear;
-      const enrollmentYear =
-        !Number.isNaN(yearNum) && yearNum >= 1990 && yearNum <= 2100
-          ? Math.round(yearNum)
-          : defaultYear;
+      let rawName = cols[0].trim();
+      let rawStudentIdCell = cols[1].trim();
+
+      // 「学籍番号, 氏名」の順で並んでいる場合は自動スワップする
+      const col0Normalized = normalizeStudentId(rawName);
+      const col1Normalized = normalizeStudentId(rawStudentIdCell);
+      if (
+        isValidHalfWidthStudentId(col0Normalized) &&
+        /\d/.test(col0Normalized) &&
+        !isValidHalfWidthStudentId(col1Normalized)
+      ) {
+        [rawName, rawStudentIdCell] = [rawStudentIdCell, rawName];
+      }
+
+      const name = rawName;
+      const studentId = normalizeStudentId(rawStudentIdCell);
+      const yearNum = cols[2] ? Number(cols[2]) : NaN;
+      const hasExplicitYear =
+        !Number.isNaN(yearNum) && yearNum >= 1990 && yearNum <= 2100;
+      const enrollmentYear = hasExplicitYear
+        ? Math.round(yearNum)
+        : inferEnrollmentYearFromStudentId(studentId, defaultYear);
       const roleRaw = (cols[3] ?? '').trim().toUpperCase();
       const role: Role = roleRaw === 'ADMIN' ? 'ADMIN' : 'VOTER';
 
-      if (!name || !email.includes('@')) {
+      if (!name || !studentId) {
         errors.push(`${i + 1}行目: 不正な形式です (${cols.join(',')})`);
+        continue;
+      }
+
+      if (!isValidHalfWidthStudentId(studentId)) {
+        errors.push(
+          `${i + 1}行目: 学籍番号に全角文字または使用できない文字が含まれています (${rawStudentIdCell})`,
+        );
+        continue;
+      }
+
+      const studentIdHash = await hashStudentId(
+        studentId,
+        config.studentIdHashSecret,
+      );
+
+      if (existingHashes.has(studentIdHash)) {
+        skippedCount++;
         continue;
       }
 
@@ -791,35 +852,42 @@ export const adminRoutes = new Hono<AppEnv>()
         .insert(users)
         .values({
           id: crypto.randomUUID(),
-          email,
+          studentIdHash,
           name,
           role,
           enrollmentYear,
+          isGradeConfirmed: hasExplicitYear,
           createdAt: now,
           updatedAt: now,
         })
-        .onConflictDoUpdate({
-          target: users.email,
-          set: {
-            name,
-            enrollmentYear,
-            ...(cols[3] ? { role } : {}),
-            updatedAt: now,
-          },
-        });
-      upsertedCount++;
+        .onConflictDoNothing({ target: users.studentIdHash });
+
+      existingHashes.add(studentIdHash);
+      insertedCount++;
     }
 
     const updatedUsers = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        enrollmentYear: users.enrollmentYear,
+        googleSub: users.googleSub,
+      })
       .from(users)
       .orderBy(desc(users.enrollmentYear), asc(users.name));
 
     return c.json({
-      upsertedCount,
+      upsertedCount: insertedCount,
+      insertedCount,
+      skippedCount,
       errors,
       users: updatedUsers.map((u) => ({
-        ...u,
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        enrollmentYear: u.enrollmentYear,
+        isGoogleLinked: Boolean(u.googleSub),
         grade: calculateGrade(u.enrollmentYear),
       })),
     });

@@ -13,11 +13,12 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
-      email TEXT NOT NULL UNIQUE,
+      student_id_hash TEXT NOT NULL UNIQUE,
       google_sub TEXT UNIQUE,
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'VOTER',
       enrollment_year INTEGER NOT NULL,
+      is_grade_confirmed INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

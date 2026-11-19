@@ -29,6 +29,13 @@
       "when": 1795040251233,
       "tag": "0003_vengeful_next_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1795073138198,
+      "tag": "0004_nappy_valkyrie",
+      "breakpoints": true
     }
   ]
 }

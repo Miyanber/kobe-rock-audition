@@ -5,6 +5,11 @@ import { createInMemoryTestDb } from '../db/local.ts';
 import { ensureSeedData } from '../db/seed.ts';
 import { buildRealisticSeedData } from '../db/seed-data.ts';
 import type { AppDb } from '../db/client.ts';
+import {
+  hashStudentId,
+  inferEnrollmentYearFromStudentId,
+  normalizeStudentId,
+} from '../lib/student-id.ts';
 
 function extractSessionCookie(res: Response): string {
   const setCookie = res.headers.get('set-cookie') || '';
@@ -1473,6 +1478,164 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
       { headers: { Cookie: voter1Cookie } },
     );
     expect(allowedExportRes.status).toBe(200);
+  });
+
+  it('学籍番号ハッシュ化とメール非保存の部員一括登録・バンドメンバー照合が動作する', async () => {
+    expect(normalizeStudentId(' 2000000T@gsuite.kobe-u.ac.jp ')).toBe('2000000t');
+    expect(normalizeStudentId('2000000t')).toBe('2000000t');
+
+    const h1 = await hashStudentId('2000000T@gsuite.kobe-u.ac.jp', 'secret-a');
+    const h2 = await hashStudentId('2000000t', 'secret-a');
+    const h3 = await hashStudentId('2000000t', 'secret-b');
+    expect(h1).toBe(h2);
+    expect(h1).not.toBe(h3);
+    expect(h1).toHaveLength(64);
+
+    const adminCookie = await loginAs('u-admin');
+
+    // 学籍番号のみで登録
+    const bulk1 = await app.request('/api/admin/users/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        csvText: '氏名,学籍番号,入部年度,ロール\nテスト 新入生,2612345t,2026,VOTER',
+      }),
+    });
+    expect(bulk1.status).toBe(200);
+    const body1 = (await bulk1.json()) as {
+      upsertedCount: number;
+      users: Array<{
+        id: string;
+        name: string;
+        isGoogleLinked: boolean;
+        email?: string;
+        studentIdHash?: string;
+      }>;
+    };
+    expect(body1.upsertedCount).toBe(1);
+    const created = body1.users.find((u) => u.name === 'テスト 新入生');
+    expect(created).toBeDefined();
+    expect(created?.isGoogleLinked).toBe(false);
+    expect(created?.email).toBeUndefined();
+    expect(created?.studentIdHash).toBeUndefined();
+
+    // 同じ学籍番号をメールアドレス形式で再登録すると重複スキップされる
+    const bulk2 = await app.request('/api/admin/users/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        csvText: 'テスト 新入生（更新）,2612345T@gsuite.kobe-u.ac.jp,2026,VOTER',
+      }),
+    });
+    expect(bulk2.status).toBe(200);
+    const body2 = (await bulk2.json()) as {
+      insertedCount: number;
+      skippedCount: number;
+      users: Array<{ id: string; name: string }>;
+    };
+    expect(body2.insertedCount).toBe(0);
+    expect(body2.skippedCount).toBe(1);
+    expect(body2.users.some((u) => u.name === 'テスト 新入生')).toBe(true);
+    expect(body2.users.some((u) => u.name === 'テスト 新入生（更新）')).toBe(false);
+
+    // 全角文字を含む学籍番号はエラーとして弾かれる
+    const fullWidthRes = await app.request('/api/admin/users/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        csvText: '全角 太郎,２６１２３４５ｔ,2026,VOTER',
+      }),
+    });
+    expect(fullWidthRes.status).toBe(200);
+    const fullWidthBody = (await fullWidthRes.json()) as {
+      upsertedCount: number;
+      errors: string[];
+    };
+    expect(fullWidthBody.upsertedCount).toBe(0);
+    expect(fullWidthBody.errors.length).toBe(1);
+    expect(fullWidthBody.errors[0]).toContain('全角文字');
+
+    // バンド一括登録で学籍番号トークンによるメンバー照合ができる
+    const bandBulkRes = await app.request(
+      '/api/admin/auditions/aud-2027-spring/bands/bulk',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          csvText: '1,ハッシュ照合バンド,2612345t',
+          replaceExisting: false,
+        }),
+      },
+    );
+    expect(bandBulkRes.status).toBe(200);
+    const bandBulkBody = (await bandBulkRes.json()) as {
+      insertedCount: number;
+      warnings: string[];
+    };
+    expect(bandBulkBody.insertedCount).toBe(1);
+    expect(bandBulkBody.warnings).toEqual([]);
+
+    // 学籍番号からの仮年度推定・逆順列（学籍番号, 氏名）・初回ログイン時の回生確定
+    expect(inferEnrollmentYearFromStudentId('2412345k', 2026)).toBe(2024);
+    expect(inferEnrollmentYearFromStudentId('abc', 2026)).toBe(2026);
+
+    const swappedRes = await app.request('/api/admin/users/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie,
+      },
+      body: JSON.stringify({
+        csvText: '2499999k,逆順 花子',
+      }),
+    });
+    expect(swappedRes.status).toBe(200);
+    const swappedBody = (await swappedRes.json()) as {
+      upsertedCount: number;
+      users: Array<{ id: string; name: string; enrollmentYear: number }>;
+    };
+    expect(swappedBody.upsertedCount).toBe(1);
+    const swappedUser = swappedBody.users.find((u) => u.name === '逆順 花子');
+    expect(swappedUser).toBeDefined();
+    expect(swappedUser?.enrollmentYear).toBe(2024);
+
+    // 未確定状態でログインして /api/auth/me を確認し、/api/auth/confirm-grade で確定する
+    const swappedCookie = await loginAs(swappedUser!.id);
+    const meBeforeRes = await app.request('/api/auth/me', {
+      headers: { Cookie: swappedCookie },
+    });
+    const meBefore = (await meBeforeRes.json()) as {
+      user: { isGradeConfirmed: boolean; enrollmentYear: number };
+    };
+    expect(meBefore.user.isGradeConfirmed).toBe(false);
+    expect(meBefore.user.enrollmentYear).toBe(2024);
+
+    const confirmRes = await app.request('/api/auth/confirm-grade', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: swappedCookie,
+      },
+      body: JSON.stringify({ enrollmentYear: 2023 }),
+    });
+    expect(confirmRes.status).toBe(200);
+    const confirmBody = (await confirmRes.json()) as {
+      user: { isGradeConfirmed: boolean; enrollmentYear: number };
+    };
+    expect(confirmBody.user.isGradeConfirmed).toBe(true);
+    expect(confirmBody.user.enrollmentYear).toBe(2023);
   });
 });
 

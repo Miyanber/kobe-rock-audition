@@ -12,13 +12,16 @@ export const users = sqliteTable(
   'users',
   {
     id: text('id').primaryKey(),
-    email: text('email').notNull().unique(),
+    studentIdHash: text('student_id_hash').notNull().unique(),
     googleSub: text('google_sub').unique(),
     name: text('name').notNull(),
     role: text('role', { enum: ['ADMIN', 'VOTER'] })
       .notNull()
       .default('VOTER'),
     enrollmentYear: integer('enrollment_year').notNull(),
+    isGradeConfirmed: integer('is_grade_confirmed', { mode: 'boolean' })
+      .notNull()
+      .default(true),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
-  Eye,
-  EyeOff,
+  ChevronDown,
+  ChevronUp,
   RotateCcw,
   Search,
   Shield,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { ToastNotification } from '../components/ToastNotification.tsx';
+import { UserSpreadsheetImport } from '../components/UserSpreadsheetImport.tsx';
 import type { AuditionDto, AuthUserDto, SelectableUserDto } from '../types.ts';
 import type { Role } from '../../shared/schema/index.ts';
 
@@ -24,8 +25,8 @@ interface AdminUsersPageProps {
   onCurrentUserChanged: () => Promise<void>;
 }
 
-const SAMPLE_USERS_CSV = `山田 音子,otoko@stu.kobe-u.ac.jp,2026,VOTER
-佐藤 リズム,rhythm@stu.kobe-u.ac.jp,2025,ADMIN`;
+const SAMPLE_USERS_CSV = `2600001t\t神戸 太郎
+2600002t\t六甲 花子`;
 
 export function AdminUsersPage({
   currentUser,
@@ -41,7 +42,7 @@ export function AdminUsersPage({
     null,
   );
   const [loading, setLoading] = useState(true);
-  const [showEmailColumn, setShowEmailColumn] = useState(false);
+  const [isUserListOpen, setIsUserListOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
   const [roleFilter, setRoleFilter] = useState<'ALL' | Role>('ALL');
@@ -61,14 +62,11 @@ export function AdminUsersPage({
         return false;
       }
       if (q) {
-        const matchesName = u.name.toLowerCase().includes(q);
-        const matchesEmail =
-          showEmailColumn && (u.email?.toLowerCase().includes(q) ?? false);
-        if (!matchesName && !matchesEmail) return false;
+        if (!u.name.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [usersList, selectedGrades, roleFilter, searchQuery, showEmailColumn]);
+  }, [usersList, selectedGrades, roleFilter, searchQuery]);
 
   const hasActiveFilters =
     searchQuery.trim() !== '' ||
@@ -97,23 +95,27 @@ export function AdminUsersPage({
     void loadUsers();
   }, [loadUsers]);
 
-  const handleBulkUpload = async () => {
-    if (!csvText.trim()) return;
+  const submitBulkCsv = async (targetCsv: string) => {
+    if (!targetCsv.trim()) return;
     setMessage(null);
     try {
       const res = await apiJson<{
         upsertedCount: number;
+        insertedCount?: number;
+        skippedCount?: number;
         errors: string[];
         users: Array<SelectableUserDto & { role: Role }>;
       }>('/api/admin/users/bulk', {
         method: 'POST',
-        body: JSON.stringify({ csvText }),
+        body: JSON.stringify({ csvText: targetCsv }),
       });
       setUsersList(res.users);
       setCsvText('');
+      const inserted = res.insertedCount ?? res.upsertedCount;
+      const skipped = res.skippedCount ?? 0;
       setMessage({
         type: res.errors.length > 0 ? 'err' : 'ok',
-        text: `${res.upsertedCount}名の部員データを登録・更新しました${
+        text: `${inserted}名を新規登録しました（重複スキップ: ${skipped}件）${
           res.errors.length > 0 ? `（エラー: ${res.errors.join(' / ')}）` : ''
         }`,
       });
@@ -123,6 +125,10 @@ export function AdminUsersPage({
         text: err instanceof Error ? err.message : '一括登録に失敗しました',
       });
     }
+  };
+
+  const handleBulkUpload = async () => {
+    await submitBulkCsv(csvText);
   };
 
   const handleToggleRole = async (
@@ -220,9 +226,21 @@ export function AdminUsersPage({
         onClose={() => setMessage(null)}
       />
 
-      {/* 部員一覧 & 権限管理 */}
+      {/* 部員一覧 & 権限管理（アコーディオン） */}
       <section className="bg-zinc-50 border border-zinc-300 rounded-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between flex-wrap gap-2">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={isUserListOpen}
+          onClick={() => setIsUserListOpen((prev) => !prev)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsUserListOpen((prev) => !prev);
+            }
+          }}
+          className="px-5 py-4 border-b border-zinc-300 flex items-center justify-between flex-wrap gap-2 cursor-pointer hover:bg-zinc-100/70 transition"
+        >
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
               <Users className="h-5 w-5 text-zinc-700" />
@@ -235,33 +253,27 @@ export function AdminUsersPage({
             )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              type="button"
-              aria-pressed={showEmailColumn}
-              onClick={() => setShowEmailColumn((prev) => !prev)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs font-semibold border transition cursor-pointer ${
-                showEmailColumn
-                  ? 'bg-slate-700 text-white border-slate-700'
-                  : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
-              }`}
-            >
-              {showEmailColumn ? (
+            <span className="text-xs text-zinc-500 hidden sm:inline">
+              ※回生は入部年度から毎年4月基準で自動算出されます
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm border border-zinc-300 bg-white text-xs font-bold text-zinc-700">
+              {isUserListOpen ? (
                 <>
-                  <EyeOff className="h-3.5 w-3.5" />
-                  <span>メールアドレスを非表示</span>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  <span>閉じる</span>
                 </>
               ) : (
                 <>
-                  <Eye className="h-3.5 w-3.5" />
-                  <span>メールアドレスを表示</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  <span>一覧を表示</span>
                 </>
               )}
-            </button>
-            <span className="text-xs text-zinc-500">
-              ※回生は入部年度から毎年4月基準で自動算出されます
             </span>
           </div>
         </div>
+
+        {isUserListOpen && (
+          <>
 
         {/* 検索・フィルタバー */}
         <div className="px-5 py-3.5 bg-zinc-100 border-b border-zinc-300 space-y-3">
@@ -271,7 +283,7 @@ export function AdminUsersPage({
                 htmlFor="admin-users-search"
                 className="block text-xs font-bold text-zinc-700 mb-1"
               >
-                {showEmailColumn ? '氏名・メールアドレス検索' : '氏名検索'}
+                氏名検索
               </label>
               <div className="relative">
                 <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -280,9 +292,7 @@ export function AdminUsersPage({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={
-                    showEmailColumn ? '氏名またはメールアドレスで検索' : '氏名で検索'
-                  }
+                  placeholder="氏名で検索"
                   className="w-full rounded-sm border border-zinc-300 bg-white pl-8 pr-8 py-1.5 text-xs focus:border-slate-700 focus:outline-none"
                 />
                 {searchQuery && (
@@ -387,8 +397,8 @@ export function AdminUsersPage({
               <thead>
                 <tr className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
                   <th className="px-4 py-3">氏名</th>
-                  {showEmailColumn && <th className="px-4 py-3">メールアドレス</th>}
                   <th className="px-4 py-3">入部年度 / 回生</th>
+                  <th className="px-4 py-3">ログイン連携</th>
                   <th className="px-4 py-3">ロール</th>
                   <th className="px-4 py-3 text-right">操作</th>
                 </tr>
@@ -404,13 +414,19 @@ export function AdminUsersPage({
                         </span>
                       )}
                     </td>
-                    {showEmailColumn && (
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-600">
-                        {u.email}
-                      </td>
-                    )}
                     <td className="px-4 py-3 text-zinc-700">
                       {u.enrollmentYear}年入部・{u.grade}回生
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold ${
+                          u.isGoogleLinked
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-zinc-100 text-zinc-500 border border-zinc-300'
+                        }`}
+                      >
+                        {u.isGoogleLinked ? '連携済み' : '未ログイン'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -462,7 +478,7 @@ export function AdminUsersPage({
                 {filteredUsers.length === 0 && (
                   <tr>
                     <td
-                      colSpan={showEmailColumn ? 5 : 4}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-xs text-zinc-500 space-y-2"
                     >
                       <div>条件に一致する部員が見つかりません</div>
@@ -483,14 +499,16 @@ export function AdminUsersPage({
             </table>
           </div>
         )}
+          </>
+        )}
       </section>
 
-      {/* 部員マスタ CSV/TSV 一括登録 */}
-      <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-3">
+      {/* 部員マスタ Excel / CSV / TSV 一括登録 */}
+      <section className="bg-zinc-50 border border-zinc-300 rounded-sm p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-base font-bold text-zinc-800 flex items-center gap-2">
             <Upload className="h-5 w-5 text-slate-700" />
-            部員マスタ CSV / TSV 一括登録・更新
+            部員マスタ 一括登録・更新
           </h2>
           <button
             type="button"
@@ -500,25 +518,32 @@ export function AdminUsersPage({
             サンプル形式を挿入
           </button>
         </div>
-        <p className="text-xs text-zinc-500">
-          書式: <code className="bg-zinc-100 px-1.5 py-0.5 rounded">氏名,メールアドレス,入部年度[,ロール]</code>
-          ※同一メールアドレスは自動上書き更新されます
-        </p>
-        <textarea
-          rows={4}
-          value={csvText}
-          onChange={(e) => setCsvText(e.target.value)}
-          placeholder={`山田 音子,otoko@stu.kobe-u.ac.jp,2026,VOTER\n佐藤 リズム,rhythm@stu.kobe-u.ac.jp,2025,ADMIN`}
-          className="w-full rounded-sm border border-zinc-300 px-3.5 py-2.5 text-sm font-mono"
+
+        <UserSpreadsheetImport
+          onImportCsvText={submitBulkCsv}
+          onPopulateTextarea={(text) => setCsvText(text)}
         />
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleBulkUpload}
-            className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-700 text-white text-sm font-bold cursor-pointer"
-          >
-            部員を一括登録 / 更新
-          </button>
+
+        <div className="space-y-2">
+          <p className="text-xs text-zinc-500">
+            <strong>Excelから直接コピペ</strong>（<code className="bg-zinc-100 px-1.5 py-0.5 rounded">学籍番号</code> と <code className="bg-zinc-100 px-1.5 py-0.5 rounded">氏名</code> の2列を選択してコピー＆貼り付け）または <strong>CSV形式</strong>（<code className="bg-zinc-100 px-1.5 py-0.5 rounded">学籍番号,氏名</code> / <code className="bg-zinc-100 px-1.5 py-0.5 rounded">氏名,学籍番号</code>）で入力できます。すでに登録済みの学籍番号はスキップされます。
+          </p>
+          <textarea
+            rows={4}
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            placeholder={`2600001t\t神戸 太郎\n2600002t\t六甲 花子`}
+            className="w-full rounded-sm border border-zinc-300 bg-white px-3.5 py-2.5 text-sm font-mono"
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleBulkUpload}
+              className="px-4 py-2 rounded-sm bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold cursor-pointer"
+            >
+              貼り付け内容を登録（重複はスキップ）
+            </button>
+          </div>
         </div>
       </section>
     </div>

@@ -115,7 +115,6 @@ export async function loadAuditionAggregation(
       submittedAt: auditionVoters.submittedAt,
       generalFeedback: auditionVoters.generalFeedback,
       userName: users.name,
-      email: users.email,
       enrollmentYear: users.enrollmentYear,
     })
     .from(auditionVoters)
@@ -153,7 +152,6 @@ export async function loadAuditionAggregation(
     voterRows.map((v) => ({
       userId: v.userId,
       userName: v.userName,
-      email: v.email,
       enrollmentYear: v.enrollmentYear,
       permissionType: v.permissionType,
       isSubmitted: v.isSubmitted,

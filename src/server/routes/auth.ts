@@ -11,10 +11,19 @@ import {
   isAllowedDomainEmail,
   issueSessionCookie,
 } from '../lib/session.ts';
+import {
+  hashStudentId,
+  inferEnrollmentYearFromStudentId,
+  normalizeStudentId,
+} from '../lib/student-id.ts';
 import { calculateGrade, getAcademicYear } from '../../shared/grade.ts';
 
 const DevLoginSchema = z.object({
   userId: z.string().min(1),
+});
+
+const ConfirmGradeSchema = z.object({
+  enrollmentYear: z.number().int().min(1990).max(2100),
 });
 
 export const authRoutes = new Hono<AppEnv>()
@@ -36,6 +45,31 @@ export const authRoutes = new Hono<AppEnv>()
   .post('/logout', (c) => {
     clearSessionCookie(c);
     return c.json({ ok: true });
+  })
+  .post('/confirm-grade', zValidator('json', ConfirmGradeSchema), async (c) => {
+    const user = c.get('user');
+    if (!user) {
+      return c.json({ error: '認証が必要です。ログインしてください。' }, 401);
+    }
+    const { enrollmentYear } = c.req.valid('json');
+    const db = c.get('db');
+    await db
+      .update(users)
+      .set({
+        enrollmentYear,
+        isGradeConfirmed: true,
+        updatedAt: Date.now(),
+      })
+      .where(eq(users.id, user.id));
+
+    return c.json({
+      user: {
+        ...user,
+        enrollmentYear,
+        isGradeConfirmed: true,
+        grade: calculateGrade(enrollmentYear),
+      },
+    });
   })
   .get('/dev-users', async (c) => {
     const config = getRuntimeConfig(c);
@@ -72,10 +106,10 @@ export const authRoutes = new Hono<AppEnv>()
     const [found] = await db
       .select({
         id: users.id,
-        email: users.email,
         name: users.name,
         role: users.role,
         enrollmentYear: users.enrollmentYear,
+        isGradeConfirmed: users.isGradeConfirmed,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -139,12 +173,28 @@ export const authRoutes = new Hono<AppEnv>()
     const db = c.get('db');
     const now = Date.now();
     const isInitialAdmin = config.initialAdminEmails.includes(emailLower);
+    const studentId = normalizeStudentId(emailLower);
+    if (!studentId) {
+      return c.redirect('/login?error=invalid_domain');
+    }
+    const studentIdHash = await hashStudentId(
+      studentId,
+      config.studentIdHashSecret,
+    );
 
-    const [existing] = await db
+    let [existing] = await db
       .select()
       .from(users)
-      .where(eq(users.email, emailLower))
+      .where(eq(users.studentIdHash, studentIdHash))
       .limit(1);
+
+    if (!existing && googleUser.id) {
+      [existing] = await db
+        .select()
+        .from(users)
+        .where(eq(users.googleSub, googleUser.id))
+        .limit(1);
+    }
 
     let targetUserId: string;
 
@@ -155,7 +205,7 @@ export const authRoutes = new Hono<AppEnv>()
         .set({
           googleSub: googleUser.id ?? existing.googleSub,
           role: isInitialAdmin ? 'ADMIN' : existing.role,
-          name: existing.name || googleUser.name || emailLower.split('@')[0],
+          name: existing.name || googleUser.name?.trim() || studentId,
           updatedAt: now,
         })
         .where(eq(users.id, existing.id));
@@ -166,11 +216,15 @@ export const authRoutes = new Hono<AppEnv>()
       targetUserId = crypto.randomUUID();
       await db.insert(users).values({
         id: targetUserId,
-        email: emailLower,
+        studentIdHash,
         googleSub: googleUser.id ?? null,
-        name: googleUser.name?.trim() || emailLower.split('@')[0],
+        name: googleUser.name?.trim() || studentId,
         role: isInitialAdmin ? 'ADMIN' : 'VOTER',
-        enrollmentYear: getAcademicYear(),
+        enrollmentYear: inferEnrollmentYearFromStudentId(
+          studentId,
+          getAcademicYear(),
+        ),
+        isGradeConfirmed: false,
         createdAt: now,
         updatedAt: now,
       });

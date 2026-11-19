@@ -15,10 +15,10 @@ export function createDbMiddleware(dbResolver: (c: Parameters<MiddlewareHandler<
       const [found] = await db
         .select({
           id: users.id,
-          email: users.email,
           name: users.name,
           role: users.role,
           enrollmentYear: users.enrollmentYear,
+          isGradeConfirmed: users.isGradeConfirmed,
         })
         .from(users)
         .where(eq(users.id, userId))
