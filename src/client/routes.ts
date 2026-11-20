@@ -296,8 +296,8 @@ export function buildDocumentTitle(
 ): string {
   const label = ROUTE_LABELS[route];
   if (route === 'admin-users' || !audition) {
-    return `${label} | Kobe Rock Audition`;
+    return `${label} | 神大ROCK AUDITION`;
   }
   const academicYear = getAcademicYearFromDateString(audition.eventDate);
-  return `[${academicYear}] ${audition.title} - ${label} | Kobe Rock Audition`;
+  return `[${academicYear}] ${audition.title} - ${label} | 神大ROCK AUDITION`;
 }

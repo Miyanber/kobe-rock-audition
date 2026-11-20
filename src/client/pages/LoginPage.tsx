@@ -74,7 +74,7 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
               <Award className="h-7 w-7 text-white" />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-zinc-800 tracking-tight">
-              Kobe Rock Audition
+              神大ROCK AUDITION
             </h1>
             <p className="text-xs sm:text-sm text-zinc-600 mt-1">
               軽音サークル オーディション採点・集計システム

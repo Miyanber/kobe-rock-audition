@@ -39,7 +39,7 @@ export function Layout({
               </div>
               <div className="truncate">
                 <span className="font-bold tracking-tight text-sm sm:text-base">
-                  Kobe Rock Audition
+                  神大ROCK AUDITION
                 </span>
               </div>
             </div>

@@ -135,10 +135,10 @@ describe('クライアントルート定義', () => {
     expect(getDefaultRouteForAudition(closed)).toBe('results');
 
     expect(buildDocumentTitle('scoring', active)).toBe(
-      '[2026] now-active - 採点 | Kobe Rock Audition',
+      '[2026] now-active - 採点 | 神大ROCK AUDITION',
     );
     expect(buildDocumentTitle('admin-users', active)).toBe(
-      '部員管理 | Kobe Rock Audition',
+      '部員管理 | 神大ROCK AUDITION',
     );
   });
 

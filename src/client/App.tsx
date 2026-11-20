@@ -323,7 +323,7 @@ export function App() {
   // ブラウザタブのタイトルを動的に更新
   useEffect(() => {
     if (!user) {
-      document.title = 'ログイン | Kobe Rock Audition';
+      document.title = 'ログイン | 神大ROCK AUDITION';
       return;
     }
     document.title = buildDocumentTitle(
