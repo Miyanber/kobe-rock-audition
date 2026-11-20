@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `is_grade_confirmed` integer DEFAULT true NOT NULL;

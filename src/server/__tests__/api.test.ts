@@ -1622,20 +1622,33 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(meBefore.user.isGradeConfirmed).toBe(false);
     expect(meBefore.user.enrollmentYear).toBe(2024);
 
+    // スペースなしの名前は 400 で拒否される
+    const invalidConfirmRes = await app.request('/api/auth/confirm-grade', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: swappedCookie,
+      },
+      body: JSON.stringify({ enrollmentYear: 2023, name: '逆順花子' }),
+    });
+    expect(invalidConfirmRes.status).toBe(400);
+
+    // 全角スペース入力も半角スペースに統一されて保存される
     const confirmRes = await app.request('/api/auth/confirm-grade', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Cookie: swappedCookie,
       },
-      body: JSON.stringify({ enrollmentYear: 2023 }),
+      body: JSON.stringify({ enrollmentYear: 2023, name: '逆順　花子' }),
     });
     expect(confirmRes.status).toBe(200);
     const confirmBody = (await confirmRes.json()) as {
-      user: { isGradeConfirmed: boolean; enrollmentYear: number };
+      user: { isGradeConfirmed: boolean; enrollmentYear: number; name: string };
     };
     expect(confirmBody.user.isGradeConfirmed).toBe(true);
     expect(confirmBody.user.enrollmentYear).toBe(2023);
+    expect(confirmBody.user.name).toBe('逆順 花子');
   });
 });
 

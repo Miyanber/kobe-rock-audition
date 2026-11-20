@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GraduationCap } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
 import { formatGradeLabel, getAcademicYear } from '../../shared/grade.ts';
+import { isValidMemberName, normalizeMemberName } from '../../shared/name.ts';
 import type { AuthUserDto } from '../types.ts';
 
 interface GradeConfirmModalProps {
@@ -14,16 +15,27 @@ export function GradeConfirmModal({
   onConfirmed,
 }: GradeConfirmModalProps) {
   const academicYear = getAcademicYear();
+  const yearOptions = [academicYear, academicYear - 1, academicYear - 2];
+  const [name, setName] = useState<string>(
+    normalizeMemberName(user.name ?? ''),
+  );
   const [selectedYear, setSelectedYear] = useState<number>(
-    user.enrollmentYear || academicYear,
+    yearOptions.includes(user.enrollmentYear)
+      ? user.enrollmentYear
+      : academicYear,
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const yearOptions = Array.from({ length: 8 }, (_, idx) => academicYear - idx);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedName = normalizeMemberName(name);
+    if (!isValidMemberName(normalizedName)) {
+      setError(
+        '氏名は「苗字 名前」の形式（間に半角または全角スペース）で入力してください。',
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -31,13 +43,16 @@ export function GradeConfirmModal({
         '/api/auth/confirm-grade',
         {
           method: 'POST',
-          body: JSON.stringify({ enrollmentYear: selectedYear }),
+          body: JSON.stringify({
+            name: normalizedName,
+            enrollmentYear: selectedYear,
+          }),
         },
       );
       onConfirmed(res.user);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : '回生の保存に失敗しました。',
+        err instanceof Error ? err.message : '登録情報の保存に失敗しました。',
       );
     } finally {
       setSubmitting(false);
@@ -64,62 +79,62 @@ export function GradeConfirmModal({
               id="grade-confirm-title"
               className="text-base font-bold text-zinc-800"
             >
-              回生（入部年度）の確認
+              氏名・回生（入部年度）の登録
             </h2>
             <p className="text-xs text-zinc-500 mt-1">
-              {user.name} さんの初回ログインです。学籍番号から推定された回生を確認し、必要に応じて修正してください（バンド登録や集計表示に使われます）。
+              初回ログインです。正しい氏名と現在の回生（入部年度）を入力・選択してください（バンド登録や集計表示に使われます）。
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {yearOptions.slice(0, 4).map((year) => {
+        <div>
+          <label
+            htmlFor="grade-confirm-name"
+            className="block text-xs font-bold text-zinc-700 mb-1"
+          >
+            氏名（苗字と名前の間にスペース）
+          </label>
+          <input
+            id="grade-confirm-name"
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: 山田 太郎"
+            className="w-full rounded-sm border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:border-slate-700 focus:outline-none"
+          />
+          <p className="text-[11px] text-zinc-500 mt-1">
+            半角・全角どちらのスペースでも入力できます（保存時に半角スペースへ統一されます）。
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {yearOptions.map((year) => {
             const active = selectedYear === year;
             return (
               <button
                 key={year}
                 type="button"
                 onClick={() => setSelectedYear(year)}
-                className={`px-3 py-2.5 rounded-sm border text-left transition cursor-pointer ${
+                className={`px-3.5 py-2.5 rounded-sm border text-left transition cursor-pointer flex items-center justify-between ${
                   active
                     ? 'border-slate-700 bg-slate-700 text-white'
                     : 'border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
                 }`}
               >
-                <div className="text-sm font-bold">
+                <span className="text-sm font-bold">
                   {formatGradeLabel(year)}
-                </div>
-                <div
-                  className={`text-[11px] ${
+                </span>
+                <span
+                  className={`text-xs ${
                     active ? 'text-slate-200' : 'text-zinc-500'
                   }`}
                 >
                   {year}年度入部
-                </div>
+                </span>
               </button>
             );
           })}
-        </div>
-
-        <div>
-          <label
-            htmlFor="grade-confirm-select"
-            className="block text-xs font-bold text-zinc-700 mb-1"
-          >
-            その他の年度（5回生・院生・OB/OGなど）
-          </label>
-          <select
-            id="grade-confirm-select"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full rounded-sm border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
-          >
-            {yearOptions.map((year) => (
-              <option key={year} value={year}>
-                {formatGradeLabel(year)}（{year}年度入部）
-              </option>
-            ))}
-          </select>
         </div>
 
         {error && (

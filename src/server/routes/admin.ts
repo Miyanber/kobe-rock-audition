@@ -40,6 +40,7 @@ import {
   type Role,
 } from '../../shared/schema/index.ts';
 import { calculateGrade, getAcademicYear } from '../../shared/grade.ts';
+import { normalizeMemberName } from '../../shared/name.ts';
 import { parseJstDeadlineMs } from '../../shared/deadline.ts';
 import type { AppDb } from '../db/client.ts';
 
@@ -815,7 +816,7 @@ export const adminRoutes = new Hono<AppEnv>()
         [rawName, rawStudentIdCell] = [rawStudentIdCell, rawName];
       }
 
-      const name = rawName;
+      const name = normalizeMemberName(rawName);
       const studentId = normalizeStudentId(rawStudentIdCell);
       const yearNum = cols[2] ? Number(cols[2]) : NaN;
       const hasExplicitYear =

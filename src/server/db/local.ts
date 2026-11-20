@@ -90,6 +90,15 @@ function createTablesIfNotExists(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_scores_audition_band ON scores(audition_id, band_id);
   `);
 
+  const userCols = sqlite
+    .prepare(`PRAGMA table_info(users)`)
+    .all() as Array<{ name: string }>;
+  if (!userCols.some((col) => col.name === 'is_grade_confirmed')) {
+    sqlite.exec(
+      `ALTER TABLE users ADD COLUMN is_grade_confirmed INTEGER NOT NULL DEFAULT 1;`,
+    );
+  }
+
   const voterCols = sqlite
     .prepare(`PRAGMA table_info(audition_voters)`)
     .all() as Array<{ name: string }>;

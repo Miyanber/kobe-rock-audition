@@ -17,6 +17,7 @@ import {
   normalizeStudentId,
 } from '../lib/student-id.ts';
 import { calculateGrade, getAcademicYear } from '../../shared/grade.ts';
+import { isValidMemberName, normalizeMemberName } from '../../shared/name.ts';
 
 const DevLoginSchema = z.object({
   userId: z.string().min(1),
@@ -24,6 +25,13 @@ const DevLoginSchema = z.object({
 
 const ConfirmGradeSchema = z.object({
   enrollmentYear: z.number().int().min(1990).max(2100),
+  name: z
+    .string()
+    .transform((v) => normalizeMemberName(v))
+    .refine((v) => isValidMemberName(v) && v.length <= 60, {
+      message:
+        '氏名は「苗字 名前」の形式（間に半角または全角スペース）で入力してください。',
+    }),
 });
 
 export const authRoutes = new Hono<AppEnv>()
@@ -51,11 +59,12 @@ export const authRoutes = new Hono<AppEnv>()
     if (!user) {
       return c.json({ error: '認証が必要です。ログインしてください。' }, 401);
     }
-    const { enrollmentYear } = c.req.valid('json');
+    const { enrollmentYear, name } = c.req.valid('json');
     const db = c.get('db');
     await db
       .update(users)
       .set({
+        name,
         enrollmentYear,
         isGradeConfirmed: true,
         updatedAt: Date.now(),
@@ -65,6 +74,7 @@ export const authRoutes = new Hono<AppEnv>()
     return c.json({
       user: {
         ...user,
+        name,
         enrollmentYear,
         isGradeConfirmed: true,
         grade: calculateGrade(enrollmentYear),
