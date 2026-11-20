@@ -415,9 +415,9 @@ export function AdminDashboardPage({
               [
                 {
                   id: 'DIFF_CORRECTION',
-                  label: `点差補正方式・定数${audition.standardDiff}`,
+                  label: `Min-Max正規化・定数${audition.standardDiff}`,
                 },
-                { id: 'Z_SCORE', label: 'Zスコア偏差値方式' },
+                { id: 'Z_SCORE', label: 'Zスコア正規化' },
                 { id: 'RAW_AVERAGE', label: '単純平均方式' },
               ] as const
             ).map((m) => (
@@ -569,10 +569,10 @@ export function AdminDashboardPage({
                   {showComparison && (
                     <>
                       <th className="px-3 py-3 text-right whitespace-nowrap text-zinc-600">
-                        比較:点差補正
+                        比較:Min-Max正規化
                       </th>
                       <th className="px-3 py-3 text-right whitespace-nowrap text-zinc-600">
-                        比較:Z偏差値
+                        比較:Zスコア正規化
                       </th>
                       <th className="px-3 py-3 text-right whitespace-nowrap text-zinc-600">
                         比較:単純平均
@@ -1169,7 +1169,7 @@ export function AdminDashboardPage({
             <div className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-zinc-800">
-                  ① 集計結果＆全Rawデータ＆全体講評
+                  ① 集計結果＆全採点データ＆全体講評
                 </div>
                 <div className="text-[11px] text-zinc-500">
                   ランキング表 + 審査員別計算過程 + 全体講評シート

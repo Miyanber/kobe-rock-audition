@@ -1770,7 +1770,7 @@ export function AdminSetupPage({
                         詳細設定：点差補正定数（既定値 100）
                       </h3>
                       <p className="text-xs text-zinc-500">
-                        Min-Max 点差補正の換算満点です。通常は 100 固定を推奨し、過去Excelと比較する場合のみ 10 等に変更してください。
+                        Min-Max正規化の換算満点です。通常は 100 固定を推奨し、過去Excelと比較する場合のみ 10 等に変更してください。
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

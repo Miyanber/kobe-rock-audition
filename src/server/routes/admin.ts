@@ -918,7 +918,7 @@ export const adminRoutes = new Hono<AppEnv>()
           .where(eq(users.role, 'ADMIN'));
         if (admins.length <= 1) {
           return c.json(
-            { error: '最後のADMINユーザーを降格することはできません。' },
+            { error: '最後の管理者を一般部員に変更することはできません。' },
             400,
           );
         }
@@ -958,7 +958,7 @@ export const adminRoutes = new Hono<AppEnv>()
         .where(eq(users.role, 'ADMIN'));
       if (admins.length <= 1) {
         return c.json(
-          { error: '最後のADMINユーザーを削除することはできません。' },
+          { error: '最後の管理者を削除することはできません。' },
           400,
         );
       }

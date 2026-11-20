@@ -32,9 +32,9 @@ function getAggregationMethodLabel(
 ): string {
   switch (method) {
     case 'DIFF_CORRECTION':
-      return `点差補正方式 (定数${standardDiff})`;
+      return `Min-Max正規化 (定数${standardDiff})`;
     case 'Z_SCORE':
-      return 'Zスコア（偏差値）方式';
+      return 'Zスコア正規化';
     case 'RAW_AVERAGE':
       return '単純平均方式';
   }
@@ -716,7 +716,7 @@ export function VoterResultsPage({
             <div className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-zinc-800">
-                  ① 集計結果＆全Rawデータ＆全体講評
+                  ① 集計結果＆全採点データ＆全体講評
                 </div>
                 <div className="text-[11px] text-zinc-500">
                   ランキング表 + 審査員別計算過程 + 全体講評シート

@@ -20,7 +20,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_domain:
     '許可されていないドメインのGoogleアカウントです。学内Googleアカウントでログインしてください。',
   unregistered_member:
-    '部員マスタに登録されていないアカウントです。運営委員（ADMIN）へ登録を依頼してください。',
+    '部員マスタに登録されていないアカウントです。運営委員へ登録を依頼してください。',
   unverified_email:
     'メールアドレスが確認されていないためログインできません。',
   oauth_not_configured:
@@ -145,7 +145,7 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
                         ) : (
                           <UserCheck className="h-3 w-3" />
                         )}
-                        {u.role}
+                        {u.role === 'ADMIN' ? '管理者' : '一般部員'}
                       </span>
                     </button>
                   ))}

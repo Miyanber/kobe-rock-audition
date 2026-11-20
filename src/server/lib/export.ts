@@ -9,9 +9,9 @@ import type { AggregationMethod } from '../../shared/schema/index.ts';
 function methodLabel(method: AggregationMethod): string {
   switch (method) {
     case 'DIFF_CORRECTION':
-      return '点差補正方式';
+      return 'Min-Max正規化';
     case 'Z_SCORE':
-      return 'Zスコア（偏差値）方式';
+      return 'Zスコア正規化';
     case 'RAW_AVERAGE':
       return '単純平均方式';
   }
@@ -93,8 +93,8 @@ export function buildSummaryAndRawSheets(
       'ペナルティ設定値',
       '適用ペナルティ減点',
       '最終スコア(控除後)',
-      '参考_点差補正最終',
-      '参考_Zスコア偏差値最終',
+      '参考_Min-Max正規化最終',
+      '参考_Zスコア正規化最終',
       '参考_単純平均最終',
     ],
   ];
@@ -129,11 +129,11 @@ export function buildSummaryAndRawSheets(
       '審査員名',
       '権限区分',
       '有効採点数',
-      '最高点(MAX)',
-      '最低点(MIN)',
-      '点差(Diff)',
+      '最高点',
+      '最低点',
+      '点差',
       '基準点差定数',
-      '補正係数(定数/Diff)',
+      '補正係数(基準点差/点差)',
       '素点平均',
       '素点標準偏差',
     ],
@@ -155,7 +155,7 @@ export function buildSummaryAndRawSheets(
   }
 
   rawRows.push([]);
-  rawRows.push(['【全投票 Rawデータ ＆ 正規化計算結果（魅力・技術按分含む）】']);
+  rawRows.push(['【全投票 採点データ ＆ 正規化計算結果（魅力・技術按分含む）】']);
   rawRows.push([
     '出演順',
     'バンド名',
@@ -166,12 +166,12 @@ export function buildSummaryAndRawSheets(
     '素点_魅力',
     '素点_技術',
     '素点_合計',
-    '点差補正_魅力',
-    '点差補正_技術',
-    '点差補正_合計',
-    'Zスコア_魅力',
-    'Zスコア_技術',
-    'Zスコア_合計(偏差値)',
+    'Min-Max正規化_魅力',
+    'Min-Max正規化_技術',
+    'Min-Max正規化_合計',
+    'Zスコア正規化_魅力',
+    'Zスコア正規化_技術',
+    'Zスコア正規化_合計(偏差値)',
     'Z値',
     'コメント',
   ]);
@@ -272,7 +272,7 @@ export function generateSummaryAndRawExport(
       ['=== シート1: 総合ランキング集計 ==='],
       ...summaryRows,
       [],
-      ['=== シート2: 全採点Rawデータ＆補正計算過程 ==='],
+      ['=== シート2: 全採点データ＆補正計算過程 ==='],
       ...rawRows,
       [],
       ['=== シート3: 全体講評 ==='],
@@ -332,7 +332,7 @@ export function generateSummaryAndRawExport(
   wsGeneralFeedback['!cols'] = GENERAL_FEEDBACK_COL_WIDTHS;
 
   XLSX.utils.book_append_sheet(wb, wsSummary, '総合ランキング集計');
-  XLSX.utils.book_append_sheet(wb, wsRaw, '全採点Rawデータ_補正過程');
+  XLSX.utils.book_append_sheet(wb, wsRaw, '全採点データ_補正過程');
   XLSX.utils.book_append_sheet(wb, wsGeneralFeedback, '全体講評');
 
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;

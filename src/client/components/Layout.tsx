@@ -49,10 +49,10 @@ export function Layout({
                 {isAdmin && (
                   <span
                     className="inline-flex items-center gap-1 text-amber-300 font-semibold shrink-0"
-                    title="ADMIN"
+                    title="管理者"
                   >
                     <Shield className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">ADMIN</span>
+                    <span className="hidden sm:inline">管理者</span>
                   </span>
                 )}
                 <span className="font-medium text-slate-100 truncate">

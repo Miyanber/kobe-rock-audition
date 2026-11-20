@@ -310,7 +310,7 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     const wb1 = XLSX.read(await res1.arrayBuffer(), { type: 'array' });
     expect(wb1.SheetNames).toEqual([
       '総合ランキング集計',
-      '全採点Rawデータ_補正過程',
+      '全採点データ_補正過程',
       '全体講評',
     ]);
     const wb1FeedbackRows = XLSX.utils.sheet_to_json<string[]>(

@@ -25,6 +25,11 @@ interface AdminUsersPageProps {
   onCurrentUserChanged: () => Promise<void>;
 }
 
+const ROLE_LABELS: Record<Role, string> = {
+  ADMIN: '管理者',
+  VOTER: '一般部員',
+};
+
 const SAMPLE_USERS_CSV = `2600001t\t神戸 太郎
 2600002t\t六甲 花子`;
 
@@ -147,12 +152,12 @@ export function AdminUsersPage({
       }
       setMessage({
         type: 'ok',
-        text: `「${target.name}」の権限を ${nextRole} に変更しました`,
+        text: `「${target.name}」の権限を ${ROLE_LABELS[nextRole]} に変更しました`,
       });
     } catch (err) {
       setMessage({
         type: 'err',
-        text: err instanceof Error ? err.message : 'ロール変更に失敗しました',
+        text: err instanceof Error ? err.message : '権限の変更に失敗しました',
       });
     }
   };
@@ -198,7 +203,7 @@ export function AdminUsersPage({
             部員マスタ・権限管理
           </h1>
           <p className="text-xs text-zinc-500 mt-0.5">
-            ここで登録・編集した部員データとロール（ADMIN / VOTER）はすべてのオーディションに共通して適用されます。
+            ここで登録・編集した部員データと権限（管理者 / 一般部員）はすべてのオーディションに共通して適用されます。
           </p>
         </div>
 
@@ -352,7 +357,7 @@ export function AdminUsersPage({
 
             <div className="flex items-end justify-between gap-2 flex-wrap">
               <div>
-                <div className="text-xs font-bold text-zinc-700 mb-1">ロール</div>
+                <div className="text-xs font-bold text-zinc-700 mb-1">権限</div>
                 <div className="flex flex-wrap gap-1.5">
                   {(['ALL', 'ADMIN', 'VOTER'] as const).map((r) => {
                     const active = roleFilter === r;
@@ -368,7 +373,7 @@ export function AdminUsersPage({
                             : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
                         }`}
                       >
-                        {r === 'ALL' ? 'すべて' : r}
+                        {r === 'ALL' ? 'すべて' : ROLE_LABELS[r]}
                       </button>
                     );
                   })}
@@ -399,7 +404,7 @@ export function AdminUsersPage({
                   <th className="px-4 py-3">氏名</th>
                   <th className="px-4 py-3">入部年度 / 回生</th>
                   <th className="px-4 py-3">ログイン連携</th>
-                  <th className="px-4 py-3">ロール</th>
+                  <th className="px-4 py-3">権限</th>
                   <th className="px-4 py-3 text-right">操作</th>
                 </tr>
               </thead>
@@ -441,7 +446,7 @@ export function AdminUsersPage({
                         ) : (
                           <UserCheck className="h-3 w-3" />
                         )}
-                        {u.role}
+                        {ROLE_LABELS[u.role]}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -455,7 +460,7 @@ export function AdminUsersPage({
                               : 'bg-amber-50 hover:bg-amber-50 text-amber-800 border-amber-300'
                           }`}
                         >
-                          {u.role === 'ADMIN' ? 'VOTERへ変更' : 'ADMINへ昇格'}
+                          {u.role === 'ADMIN' ? '一般部員へ変更' : '管理者へ昇格'}
                         </button>
                         <button
                           type="button"
