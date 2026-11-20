@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   FileSpreadsheet,
+  HelpCircle,
   Lock,
   MessageSquareText,
   RefreshCw,
@@ -17,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiJson } from '../api/client.ts';
+import { AggregationAlgorithmHelpModal } from '../components/AggregationAlgorithmHelpModal.tsx';
 import { ToastNotification } from '../components/ToastNotification.tsx';
 import { ToggleSwitch } from '../components/ToggleSwitch.tsx';
 import type {
@@ -62,6 +64,7 @@ export function AdminDashboardPage({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComparison, setShowComparison] = useState(false);
+  const [showAlgorithmHelp, setShowAlgorithmHelp] = useState(false);
   const [forceShowResults, setForceShowResults] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminDashboardTab>('ranking');
   const [onlyUnsubmitted, setOnlyUnsubmitted] = useState(false);
@@ -398,7 +401,16 @@ export function AdminDashboardPage({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-sm font-bold text-zinc-800 flex items-center gap-1.5">
               <Sliders className="h-4 w-4 text-slate-700" />
-              集計アルゴリズム設定
+              <span>集計アルゴリズム設定</span>
+              <button
+                type="button"
+                onClick={() => setShowAlgorithmHelp(true)}
+                aria-label="集計アルゴリズムの説明を開く"
+                title="集計アルゴリズムの特性を見る"
+                className="inline-flex items-center justify-center rounded-full p-0.5 text-zinc-500 hover:text-slate-700 hover:bg-zinc-200/70 transition cursor-pointer"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </button>
             </h2>
             <button
               type="button"
@@ -1220,6 +1232,14 @@ export function AdminDashboardPage({
             </div>
           </div>
         </div>
+      )}
+      {audition && (
+        <AggregationAlgorithmHelpModal
+          isOpen={showAlgorithmHelp}
+          onClose={() => setShowAlgorithmHelp(false)}
+          activeMethod={audition.aggregationMethod}
+          standardDiff={audition.standardDiff}
+        />
       )}
     </div>
   );
