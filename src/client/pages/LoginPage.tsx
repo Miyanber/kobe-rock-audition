@@ -77,7 +77,7 @@ export function LoginPage({ authInfo, onLoggedIn }: LoginPageProps) {
               神大ROCK AUDITION
             </h1>
             <p className="text-xs sm:text-sm text-zinc-600 mt-1">
-              軽音サークル オーディション採点・集計システム
+              神戸大学軽音楽部ROCK オーディション採点・集計システム
             </p>
           </div>
 
