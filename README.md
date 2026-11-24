@@ -98,7 +98,7 @@ npm run build  # Vite 本番ビルド + TypeScript 型チェック
 | `GOOGLE_CLIENT_SECRET` | 本番必須 | Google Cloud Console の OAuth 2.0 クライアントシークレット |
 | `SESSION_SECRET` | 本番必須 | セッション Cookie (JWT) 署名用のランダム文字列（32文字以上推奨） |
 | `STUDENT_ID_HASH_SECRET` | 本番必須 | 学籍番号の HMAC-SHA256 ハッシュ化用シークレット（32文字以上推奨） |
-| `ALLOWED_GOOGLE_DOMAIN` | 推奨 | 許可する学内ドメイン（カンマ区切り可。例: `stu.kobe-u.ac.jp`） |
+| `ALLOWED_GOOGLE_DOMAIN` | 推奨 | 許可する学内ドメイン（カンマ区切り可。例: `gsuite.kobe-u.ac.jp`） |
 | `INITIAL_ADMIN_EMAILS` | 推奨 | 初回ログイン時に自動で `ADMIN` ロールにするメールアドレス（カンマ区切り） |
 | `ALLOW_UNREGISTERED_DOMAIN_USERS` | 任意 | `false`（既定）: 事前登録された部員（ハッシュ一致）のみ許可 / `true`: 学内ドメインなら自動作成 |
 | `ENABLE_DEV_LOGIN` | 任意 | 本番デプロイ時は必ず `"false"` に設定すること（開発用ダミーログインの有効/無効） |

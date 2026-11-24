@@ -30,8 +30,8 @@ function readEnvValue(bindings: EnvBindings | undefined, key: keyof EnvBindings)
 
 export function getRuntimeConfig(c: Context<AppEnv>): RuntimeConfig {
   const bindings = c.env;
-  const allowedRaw = readEnvValue(bindings, 'ALLOWED_GOOGLE_DOMAIN') || 'stu.kobe-u.ac.jp';
-  const adminRaw = readEnvValue(bindings, 'INITIAL_ADMIN_EMAILS') || 'admin@stu.kobe-u.ac.jp';
+  const allowedRaw = readEnvValue(bindings, 'ALLOWED_GOOGLE_DOMAIN') || 'gsuite.kobe-u.ac.jp';
+  const adminRaw = readEnvValue(bindings, 'INITIAL_ADMIN_EMAILS') || 'admin@gsuite.kobe-u.ac.jp';
   const allowUnregRaw = readEnvValue(bindings, 'ALLOW_UNREGISTERED_DOMAIN_USERS') || 'false';
   const devLoginRaw = readEnvValue(bindings, 'ENABLE_DEV_LOGIN');
 
