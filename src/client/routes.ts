@@ -13,9 +13,10 @@ export type AppRoute =
   | 'wiki'
   | 'results'
   | 'admin-setup'
-  | 'admin-users';
+  | 'admin-users'
+  | 'manual';
 
-export type AuditionScopedRoute = Exclude<AppRoute, 'admin-users'>;
+export type AuditionScopedRoute = Exclude<AppRoute, 'admin-users' | 'manual'>;
 
 export interface NavItemConfig {
   id: AppRoute;
@@ -66,6 +67,7 @@ const LEGACY_ROUTE_TO_PATH: Record<AppRoute, string> = {
   results: '/results',
   'admin-setup': '/admin/setup',
   'admin-users': '/admin/users',
+  manual: '/manual',
 };
 
 const LEGACY_PATH_TO_ROUTE: Record<string, AppRoute> = {
@@ -77,6 +79,7 @@ const LEGACY_PATH_TO_ROUTE: Record<string, AppRoute> = {
   '/admin/dashboard': 'results',
   '/admin/setup': 'admin-setup',
   '/admin/users': 'admin-users',
+  '/manual': 'manual',
 };
 
 const AUDITION_SUBPATH_TO_ROUTE: Record<
@@ -98,6 +101,7 @@ const ROUTE_LABELS: Record<AppRoute, string> = {
   results: '集計',
   'admin-setup': '設定',
   'admin-users': '部員管理',
+  manual: 'マニュアル',
 };
 
 export function normalizePathname(pathname: string): string {
@@ -110,7 +114,7 @@ export function normalizePathname(pathname: string): string {
 export function isAuditionScopedRoute(
   route: AppRoute,
 ): route is AuditionScopedRoute {
-  return route !== 'admin-users';
+  return route !== 'admin-users' && route !== 'manual';
 }
 
 export function isAdminOnlyRoute(route: AppRoute): boolean {
@@ -123,6 +127,9 @@ export function getPathForRoute(
 ): string {
   if (route === 'admin-users') {
     return '/admin/users';
+  }
+  if (route === 'manual') {
+    return '/manual';
   }
   if (auditionId) {
     return `/auditions/${encodeURIComponent(auditionId)}${AUDITION_SUBPATH[route]}`;
@@ -146,6 +153,16 @@ export function resolveLocationFromPathname(
   if (normalized === '/admin/users') {
     return {
       route: 'admin-users',
+      auditionId: null,
+      isRoot: false,
+      isBareAuditionPath: false,
+      needsRedirect: false,
+    };
+  }
+
+  if (normalized === '/manual') {
+    return {
+      route: 'manual',
       auditionId: null,
       isRoot: false,
       isBareAuditionPath: false,
@@ -295,7 +312,7 @@ export function buildDocumentTitle(
   audition?: Pick<AuditionDto, 'title' | 'eventDate'> | null,
 ): string {
   const label = ROUTE_LABELS[route];
-  if (route === 'admin-users' || !audition) {
+  if (!isAuditionScopedRoute(route) || !audition) {
     return `${label} | 神大ROCK AUDITION`;
   }
   const academicYear = getAcademicYearFromDateString(audition.eventDate);

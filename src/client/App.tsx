@@ -25,6 +25,7 @@ import { WikiBandsPage } from './pages/WikiBandsPage.tsx';
 import { AdminDashboardPage } from './pages/AdminDashboardPage.tsx';
 import { AdminSetupPage } from './pages/AdminSetupPage.tsx';
 import { AdminUsersPage } from './pages/AdminUsersPage.tsx';
+import { ManualPage } from './pages/ManualPage.tsx';
 import { VoterResultsPage } from './pages/VoterResultsPage.tsx';
 import type { AuditionDto, AuthMeResponse, AuthUserDto } from './types.ts';
 
@@ -265,7 +266,7 @@ export function App() {
       return;
     }
 
-    if (activeRoute === 'admin-users') {
+    if (activeRoute === 'admin-users' || activeRoute === 'manual') {
       return;
     }
 
@@ -431,6 +432,23 @@ export function App() {
     ) : undefined;
 
   const renderMainContent = () => {
+    if (activeRoute === 'manual') {
+      return (
+        <ManualPage
+          user={authInfo.user!}
+          returnAudition={returnAudition}
+          onReturnToApp={() =>
+            navigateTo(
+              returnAudition
+                ? getDefaultRouteForAudition(returnAudition)
+                : 'scoring',
+              returnAudition?.id ?? null,
+            )
+          }
+        />
+      );
+    }
+
     if (!auditionsLoaded && activeRoute !== 'admin-users') {
       return (
         <div className="py-16 text-center text-sm text-zinc-500">

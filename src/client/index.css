@@ -42,3 +42,185 @@
     max-width: 100%;
   }
 }
+
+.manual-prose {
+  color: #27272a;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.manual-prose h1 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #18181b;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid #d4d4d8;
+}
+
+.manual-prose h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding: 0.375rem 0 0.375rem 0.75rem;
+  border-left: 4px solid #334155;
+  background-color: #f4f4f5;
+  scroll-margin-top: 7.5rem;
+}
+
+.manual-prose h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #27272a;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  scroll-margin-top: 7.5rem;
+}
+
+.manual-prose p {
+  margin-top: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+
+.manual-prose ul,
+.manual-prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.manual-prose ul {
+  list-style-type: disc;
+}
+
+.manual-prose ol {
+  list-style-type: decimal;
+}
+
+.manual-prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.manual-prose li > ul,
+.manual-prose li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.manual-prose strong {
+  font-weight: 700;
+  color: #18181b;
+}
+
+.manual-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  background-color: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  border-radius: 2px;
+  padding: 0.1rem 0.35rem;
+  color: #1e293b;
+}
+
+.manual-prose blockquote {
+  margin-top: 0.875rem;
+  margin-bottom: 0.875rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid #64748b;
+  background-color: #f8fafc;
+  color: #334155;
+  border-radius: 2px;
+}
+
+.manual-prose blockquote p:first-child {
+  margin-top: 0;
+}
+
+.manual-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.manual-prose hr {
+  border: 0;
+  border-top: 1px solid #e4e4e7;
+  margin-top: 1.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.manual-prose figure.manual-figure {
+  margin: 1.5rem auto;
+  padding: 0.875rem;
+  background-color: #fafafa;
+  border: 1px solid #e4e4e7;
+  border-radius: 2px;
+}
+
+.manual-prose figure.manual-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid #d4d4d8;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+.manual-prose figure.manual-figure figcaption {
+  margin-top: 0.625rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #52525b;
+  line-height: 1.5;
+}
+
+.manual-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem auto;
+  border: 1px solid #d4d4d8;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+.manual-prose .manual-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+.manual-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.manual-prose th,
+.manual-prose td {
+  white-space: normal;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid #e4e4e7;
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+.manual-prose th {
+  background-color: #f4f4f5;
+  font-weight: 700;
+  color: #18181b;
+}
+
+.manual-prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.manual-prose td img {
+  margin: 0.25rem auto;
+}

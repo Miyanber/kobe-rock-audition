@@ -52,6 +52,7 @@ describe('クライアントルート定義', () => {
       '/auditions/aud-2026-winter/setup',
     );
     expect(getPathForRoute('admin-users', auditionId)).toBe('/admin/users');
+    expect(getPathForRoute('manual', auditionId)).toBe('/manual');
 
     for (const item of NAV_ITEMS) {
       const path = getPathForRoute(item.id, auditionId);
@@ -96,16 +97,26 @@ describe('クライアントルート定義', () => {
       needsRedirect: true,
     });
 
+    expect(resolveLocationFromPathname('/manual')).toEqual({
+      route: 'manual',
+      auditionId: null,
+      isRoot: false,
+      isBareAuditionPath: false,
+      needsRedirect: false,
+    });
+    expect(resolveRouteFromPathname('/manual/')).toBe('manual');
     expect(resolveRouteFromPathname('/')).toBe('scoring');
     expect(resolveRouteFromPathname('/unknown')).toBeNull();
     expect(resolveRouteFromPathname('/auditions/aud-1/unknown')).toBeNull();
     expect(isAdminOnlyRoute('results')).toBe(false);
     expect(isAdminOnlyRoute('scoring')).toBe(false);
     expect(isAdminOnlyRoute('wiki')).toBe(false);
+    expect(isAdminOnlyRoute('manual')).toBe(false);
     expect(isAdminOnlyRoute('admin-setup')).toBe(true);
     expect(isAdminOnlyRoute('admin-users')).toBe(true);
     expect(isAuditionScopedRoute('scoring')).toBe(true);
     expect(isAuditionScopedRoute('admin-users')).toBe(false);
+    expect(isAuditionScopedRoute('manual')).toBe(false);
   });
 
   it('デフォルトオーディション選択と初期タブ選択の優先順位が正しい', () => {
@@ -139,6 +150,9 @@ describe('クライアントルート定義', () => {
     );
     expect(buildDocumentTitle('admin-users', active)).toBe(
       '部員管理 | 神大ROCK AUDITION',
+    );
+    expect(buildDocumentTitle('manual', active)).toBe(
+      'マニュアル | 神大ROCK AUDITION',
     );
   });
 
