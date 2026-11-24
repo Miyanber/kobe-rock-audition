@@ -96,7 +96,7 @@ Do not weaken or bypass any of these invariants across UI, API, or aggregation:
    - Voters can only view `/api/auditions/:id/results` and download `/api/auditions/:id/export` when `status === 'CLOSED'` AND all `SCORE_AND_COMMENT` voters have `isSubmitted === true` (`unsubmittedRequiredCount === 0`).
    - In `AdminDashboardPage.tsx`, rankings, band comments, and general feedback are hidden behind a lock card while `requiredUnsubmittedCount > 0`, with an explicit admin-only preview override toggle.
 7. **Two-File Export Structure (`src/server/lib/export.ts`)**:
-   - `target=summary_and_raw`: Workbook with 3 sheets (`総合ランキング集計`, `全採点データ_補正過程`, `全体講評`).
+   - `target=summary_and_raw`: Workbook with 4 formula-linked sheets (`総合ランキング集計`, `全採点データ_補正過程`, `審査員別_補正係数`, `採点者別_補正後スコア表`).
    - `target=band_comments`: Workbook with 1 sheet per band (sanitized via `sanitizeExcelSheetName` for Excel's 31-char limit and forbidden chars) plus `全体講評` sheet, listing normalized charm/tech/total scores and comments (`-` for `COMMENT_ONLY` / null scores).
 8. **Shared Event Switcher Header & 6-Month Filter**:
    - All audition-scoped pages render `AdminAuditionHeader` sorted by `eventDate DESC` (`[academicYear] title - status`).

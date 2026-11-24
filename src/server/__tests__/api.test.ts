@@ -298,10 +298,10 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(currentBody.preparingAudition?.status).toBe('ENTRY_CLOSED');
   });
 
-  it('2種類のExcelファイル（集計＆生データ＆全体講評 / バンド別講評＋全体講評）が仕様通りのシート構成で生成される', async () => {
+  it('2種類のExcelファイル（集計＆生データ4シート数式構成 / バンド別講評＋全体講評）が仕様通りのシート構成で生成される', async () => {
     const adminCookie = await loginAs('u-admin');
 
-    // ファイル1: 集計結果 & Rawデータ & 全体講評 (3シート)
+    // ファイル1: 集計結果 & 全採点データ (4シート数式連動構成・全体講評なし)
     const res1 = await app.request(
       '/api/admin/auditions/aud-2026-winter/export?target=summary_and_raw&format=xlsx',
       { headers: { Cookie: adminCookie } },
@@ -311,21 +311,98 @@ describe('Hono API & RBAC & Export 結合テスト', () => {
     expect(wb1.SheetNames).toEqual([
       '総合ランキング集計',
       '全採点データ_補正過程',
-      '全体講評',
+      '審査員別_補正係数',
+      '採点者別_補正後スコア表',
     ]);
-    const wb1FeedbackRows = XLSX.utils.sheet_to_json<string[]>(
-      wb1.Sheets['全体講評'],
+
+    // シート1: 総合ランキング集計（出演順並び + 数式埋め込み）
+    const wsSummary = wb1.Sheets['総合ランキング集計'];
+    const summaryRows = XLSX.utils.sheet_to_json<(string | number)[]>(
+      wsSummary,
       { header: 1 },
     );
-    expect(wb1FeedbackRows[2]).toEqual([
-      '採点者名',
-      '回生',
-      '権限区分',
-      '提出状況',
-      '提出日時',
-      '全体講評',
+    expect(summaryRows[0]).toEqual([
+      '開催回',
+      '2026 冬ライブオーディション',
+      '開催日',
+      '2026-12-20',
     ]);
-    expect(wb1FeedbackRows.length).toBeGreaterThan(3);
+    expect(summaryRows[1][0]).toBe('採用集計方式');
+    expect(summaryRows[3][0]).toBe('順位');
+    // 出演順 1, 2, 3, 4 で並んでいること
+    const performanceOrders = summaryRows.slice(4).map((row) => row[1]);
+    expect(performanceOrders).toEqual([1, 2, 3, 4]);
+    // 数式セル（順位 A5, 有効投票数 E5, 正規化平均合計 L5, 最終スコア O5）が設定されていること
+    expect(wsSummary['A5']?.f).toContain('COUNTIFS');
+    expect(wsSummary['E5']?.f).toContain('COUNT(');
+    expect(wsSummary['L5']?.f).toContain('AVERAGE(');
+    expect(wsSummary['O5']?.f).toContain('ROUND(');
+
+    // シート2: 全採点データ_補正過程（scoresレコード全件のみ + 行内数式）
+    const wsRaw = wb1.Sheets['全採点データ_補正過程'];
+    const rawRows = XLSX.utils.sheet_to_json<(string | number)[]>(wsRaw, {
+      header: 1,
+    });
+    expect(rawRows[0][0]).toBe('出演順');
+    expect(rawRows[0][6]).toBe('素点_魅力');
+    expect(wsRaw['F2']?.f).toContain('IF(AND(');
+    expect(wsRaw['I2']?.f).toContain('G2+H2');
+    expect(wsRaw['L2']?.f).toContain('INDEX(');
+
+    // シート3: 審査員別_補正係数（数式算出）
+    const wsEval = wb1.Sheets['審査員別_補正係数'];
+    const evalRows = XLSX.utils.sheet_to_json<(string | number)[]>(wsEval, {
+      header: 1,
+    });
+    expect(evalRows[0]).toEqual([
+      '審査員名',
+      '権限区分',
+      '有効採点数',
+      '最高点',
+      '最低点',
+      '点差',
+      '基準点差定数',
+      '補正係数(基準点差/点差)',
+      '素点平均',
+      '素点標準偏差',
+    ]);
+    expect(wsEval['C2']?.f).toContain('COUNTIFS(');
+    expect(wsEval['D2']?.f).toContain('MAXIFS(');
+    expect(wsEval['E2']?.f).toContain('MINIFS(');
+    expect(wsEval['J2']?.f).toContain('SQRT(');
+
+    // シート4: 採点者別_補正後スコア表（行=採点者, 列=全バンド出演順）
+    const wsMatrix = wb1.Sheets['採点者別_補正後スコア表'];
+    const matrixRows = XLSX.utils.sheet_to_json<(string | number)[]>(
+      wsMatrix,
+      { header: 1 },
+    );
+    expect(matrixRows[0]).toEqual(['出演順', '', 1, 2, 3, 4]);
+    expect(matrixRows[1].slice(0, 3)).toEqual([
+      '採点者名',
+      '権限区分',
+      'The Rokko Distortion',
+    ]);
+    expect(wsMatrix['C3']?.f).toContain('SUMIFS(');
+    expect(wsMatrix['C3']?.f).toContain('INDEX(');
+    // 採点者別_補正後スコア表に数値キャッシュ値が入っていること（自バンド・未採点以外）
+    const matrixNumericValues = matrixRows
+      .slice(2)
+      .flatMap((row) => row.slice(2))
+      .filter((val): val is number => typeof val === 'number');
+    expect(matrixNumericValues.length).toBeGreaterThan(0);
+
+    // CSV 出力（ファイル1）は4セクション構成で全体講評を含まないこと
+    const csvRes1 = await app.request(
+      '/api/admin/auditions/aud-2026-winter/export?target=summary_and_raw&format=csv',
+      { headers: { Cookie: adminCookie } },
+    );
+    expect(csvRes1.status).toBe(200);
+    const csvText1 = await csvRes1.text();
+    expect(csvText1).toContain('=== シート1: 総合ランキング集計 ===');
+    expect(csvText1).toContain('=== シート3: 審査員別_補正係数 ===');
+    expect(csvText1).toContain('=== シート4: 採点者別_補正後スコア表 ===');
+    expect(csvText1).not.toContain('全体講評');
 
     // ファイル2: バンド別講評シート (4バンド + 全体講評 = 5シート)
     const res2 = await app.request(
