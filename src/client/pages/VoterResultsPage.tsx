@@ -716,10 +716,10 @@ export function VoterResultsPage({
             <div className="p-3 rounded-sm bg-zinc-100 border border-zinc-300 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-zinc-800">
-                  ① 集計結果＆全採点データ＆全体講評
+                  ① 集計結果＆全採点データ
                 </div>
                 <div className="text-[11px] text-zinc-500">
-                  ランキング表 + 審査員別計算過程 + 全体講評シート
+                  ランキング集計（数式連動）+ 全採点データ + 審査員別補正係数 + 採点者別スコア表
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
